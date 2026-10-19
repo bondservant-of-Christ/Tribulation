@@ -137,10 +137,10 @@ body.noCursor #c{cursor:none}
 }
 #pause,#over,#win{background:rgba(7,5,5,.97)}
 #cine{position:fixed;inset:0;z-index:15}
-#cine .bar{position:absolute;left:0;right:0;background:#000}
-#cine .barTop{top:0;height:calc(11vh + env(safe-area-inset-top,0px))}
-#cine .barBot{bottom:0;min-height:calc(17vh + env(safe-area-inset-bottom,0px));display:flex;align-items:flex-start;justify-content:center;padding-top:14px;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.cineLine{max-width:640px;font-family:var(--scripture);font-size:clamp(18px,4.4vw,24px);line-height:1.3;color:var(--bone);text-align:center}
+#cine .cbar{position:absolute;left:0;right:0;width:auto;height:auto;border:0;background:#000}
+#cine .cbarTop{top:0;height:calc(9vh + env(safe-area-inset-top,0px))}
+#cine .cbarBot{bottom:0;min-height:calc(15vh + env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:center;padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cineLine{max-width:760px;font-family:var(--scripture);font-size:clamp(16px,min(4.4vw,5.2vh),24px);line-height:1.3;color:var(--bone);text-align:center}
 #cineWho{display:block;font-family:var(--mono);font-size:16px;letter-spacing:.2em;color:var(--brass)}
 #cineWho:empty{display:none}
 #cineSkip{position:absolute;right:max(14px,env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));background:none;border:1px solid var(--rust);padding:6px 12px;font-size:17px;letter-spacing:.14em;color:var(--bone)}
@@ -181,8 +181,8 @@ body.noCursor #c{cursor:none}
 </div>
 
 <div id="cine" hidden>
-  <div class="bar barTop"></div>
-  <div class="bar barBot"><div class="cineLine"><span id="cineWho"></span><span id="cineText"></span></div></div>
+  <div class="cbar cbarTop"></div>
+  <div class="cbar cbarBot"><div class="cineLine"><span id="cineWho"></span><span id="cineText"></span></div></div>
   <button id="cineSkip">SKIP &rsaquo;</button>
 </div>
 
@@ -191,7 +191,7 @@ body.noCursor #c{cursor:none}
     <div class="eyebrow">REMNANT MILITIA · THE YEAR OF TRUMPETS</div>
     <h1>Tribu&shy;lation</h1>
     <blockquote>Eleven days ago the drill at Site 9 stopped. Three days ago the mine stopped answering. Tonight the stars over the ridge started going out.</blockquote>
-    <button class="cta" id="toMissions">MISSIONS</button>
+    <div class="row"><button class="cta" id="toMissions">MISSIONS</button><button class="ghost fsBtn" hidden>FULLSCREEN</button></div>
     <div class="controls">
       <span>Left thumb: move · Drag the right side: look</span>
       <span>Hold AIM to raise. Sidearms fire when you let go, and a steady hold hits harder. Automatics fire while held.</span>
@@ -225,7 +225,7 @@ body.noCursor #c{cursor:none}
       <label for="mSens">MOUSE LOOK<input type="range" id="mSens" min="0.3" max="3" step="0.1" value="1"><output id="mSensV">1.0</output></label>
       <label for="tSens">TOUCH LOOK<input type="range" id="tSens" min="0.3" max="3" step="0.1" value="1"><output id="tSensV">1.0</output></label>
     </div>
-    <div class="row"><button class="cta" id="resumeBtn">RESUME</button><button class="ghost" id="muteBtn">SOUND: ON</button><button class="ghost" id="quitBtn">ABANDON MISSION</button></div>
+    <div class="row"><button class="cta" id="resumeBtn">RESUME</button><button class="ghost" id="muteBtn">SOUND: ON</button><button class="ghost" id="quitBtn">ABANDON MISSION</button><button class="ghost fsBtn" hidden>FULLSCREEN</button></div>
   </div>
 </div>
 
@@ -1384,7 +1384,6 @@ function clearWorld(){
 let consoleObj=null,consoleScr=null,genObj=null,genHold=0,saidQuiet=false,events=[],liftStarted=false;
 function startMission(){
   initAudio();if(AC&&AC.state==='suspended')AC.resume();
-  try{const el=document.documentElement;if(el.requestFullscreen&&matchMedia('(pointer:coarse)').matches)el.requestFullscreen().catch(()=>{});}catch(e){}
   clearWorld();buildGrid();buildLevel();
   player=makePlayer();
   allies=ALLY_DEF.map(makeAlly);
@@ -1992,6 +1991,11 @@ for(const [id,get,set,key] of [['mSens',()=>mSens,v=>mSens=v,'msens'],['tSens',(
   const el=$(id),out=$(id+'V');el.value=get();out.textContent=(+get()).toFixed(1);
   el.addEventListener('input',()=>{set(+el.value);out.textContent=(+el.value).toFixed(1);try{localStorage.setItem('tribulation.'+key,el.value);}catch(e){}});
 }
+{const installed=matchMedia('(display-mode: fullscreen)').matches||matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+ const canFS=!!document.documentElement.requestFullscreen&&!installed;
+ const sync=()=>document.querySelectorAll('.fsBtn').forEach(b=>{b.hidden=!canFS;b.textContent=document.fullscreenElement?'EXIT FULLSCREEN':'FULLSCREEN';});
+ document.querySelectorAll('.fsBtn').forEach(b=>b.onclick=()=>{try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>{});}catch(e){}});
+ document.addEventListener('fullscreenchange',sync);sync();}
 $('pauseBtn').onclick=togglePause;$('resumeBtn').onclick=togglePause;
 $('reloadBtn').onclick=startReload;$('swapBtn').onclick=swapWeapon;
 $('muteBtn').onclick=()=>{muted=!muted;if(master)master.gain.value=muted?0:0.55;$('muteBtn').textContent='SOUND: '+(muted?'OFF':'ON');};
