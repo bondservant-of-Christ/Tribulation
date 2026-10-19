@@ -104,6 +104,11 @@ blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-siz
 #hitMk{position:absolute;left:-10px;top:-10px;width:20px;height:20px;opacity:0;background:linear-gradient(45deg,transparent 44%,var(--blood) 44% 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,var(--blood) 44% 56%,transparent 56%)}
 #dmgDir{position:absolute;left:50%;top:50%;width:min(64vw,64vh);height:min(64vw,64vh);transform:translate(-50%,-50%);opacity:0}
 #dmgDir i{position:absolute;left:28%;right:28%;top:0;height:22px;border-top:5px solid var(--blood);border-radius:50% 50% 0 0;filter:drop-shadow(0 0 6px var(--blood))}
+body.noCursor #c{cursor:none}
+.sens{display:grid;gap:10px;max-width:420px}
+.sens label{display:grid;grid-template-columns:150px 1fr 44px;gap:12px;align-items:center;font-size:18px;letter-spacing:.1em}
+.sens input{accent-color:var(--blood);width:100%;min-width:0}
+.sens output{color:var(--brass);font-variant-numeric:tabular-nums;text-align:right}
 #lockHint{position:absolute;left:50%;top:calc(50% + 28px);transform:translateX(-50%);font-size:17px;letter-spacing:.2em;color:var(--brass);text-shadow:0 0 4px #000}
 #fireBtn{pointer-events:auto;position:absolute;right:calc(max(14px,env(safe-area-inset-right,0px)) + 10px);bottom:calc(92px + env(safe-area-inset-bottom,0px));width:88px;height:88px;border-radius:50%;background:rgba(196,42,36,.16);border:2px solid rgba(196,42,36,.7);font-size:19px;letter-spacing:.14em;color:var(--bone);touch-action:none}
 #fireBtn.on{background:rgba(196,42,36,.45)}
@@ -137,7 +142,7 @@ blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-siz
   <div id="squad"></div>
   <div id="xh"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><b id="hitMk"></b></div>
   <div id="dmgDir"><i></i></div>
-  <div id="lockHint" hidden>CLICK TO LOOK AROUND</div>
+  <div id="lockHint" hidden>CLICK TO LOCK THE MOUSE &middot; ESC TO PAUSE</div>
   <button id="fireBtn" aria-label="Aim and fire">AIM</button>
   <div class="sideBtns">
     <button id="swapBtn">SWAP</button>
@@ -193,6 +198,10 @@ blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-siz
   <div class="panel">
     <div class="eyebrow">HOLD FAST</div>
     <h2>Paused</h2>
+    <div class="sens">
+      <label for="mSens">MOUSE LOOK<input type="range" id="mSens" min="0.3" max="3" step="0.1" value="1"><output id="mSensV">1.0</output></label>
+      <label for="tSens">TOUCH LOOK<input type="range" id="tSens" min="0.3" max="3" step="0.1" value="1"><output id="tSensV">1.0</output></label>
+    </div>
     <div class="row"><button class="cta" id="resumeBtn">RESUME</button><button class="ghost" id="muteBtn">SOUND: ON</button><button class="ghost" id="quitBtn">ABANDON MISSION</button></div>
   </div>
 </div>
@@ -1131,6 +1140,9 @@ const mouse={down:false,x:0,y:0};
 let lookPtr=null,firePtr=null,aimHeld=false,lastTouch=matchMedia('(pointer:coarse)').matches,lockLostAt=0,wasLocked=false;
 const lookAcc={x:0,y:0};
 const SENS_T=0.0058,SENS_M=0.0024;
+let mSens=1,tSens=1,mouseSeen=false;
+try{mSens=+localStorage.getItem('tribulation.msens')||1;tSens=+localStorage.getItem('tribulation.tsens')||1;}catch(e){}
+function tryLock(){if(lastTouch||document.pointerLockElement||state!=='play')return;try{const p=canvas.requestPointerLock&&canvas.requestPointerLock();if(p&&p.catch)p.catch(()=>{});}catch(err){}}
 const xh=$('xh');
 function stickEl(){return $('stickL');}
 function resetInput(){sticks.L=null;stickEl().style.display='none';lookPtr=null;firePtr=null;aimHeld=false;mouse.down=false;aiming=false;aimT=0;lookAcc.x=lookAcc.y=0;$('fireBtn').classList.remove('on');
@@ -1142,7 +1154,7 @@ addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse'){
     lastTouch=false;mouse.x=e.clientX;mouse.y=e.clientY;
     if(e.button===0){mouse.down=true;aimHeld=true;}
-    if(!document.pointerLockElement){try{const p=canvas.requestPointerLock&&canvas.requestPointerLock();if(p&&p.catch)p.catch(()=>{});}catch(err){}}
+    tryLock();
     return;}
   lastTouch=true;
   if(e.clientX<innerWidth*0.45){if(sticks.L)return;sticks.L={id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0};const el=stickEl();el.style.display='block';el.style.left=e.clientX+'px';el.style.top=e.clientY+'px';el.firstElementChild.style.transform='';}
@@ -1151,10 +1163,11 @@ addEventListener('pointerdown',e=>{
 addEventListener('pointermove',e=>{
   if(state!=='play')return;
   if(e.pointerType==='mouse'){
-    if(document.pointerLockElement){lookAcc.x+=e.movementX*SENS_M;lookAcc.y+=e.movementY*SENS_M;}
-    else if(mouse.down){lookAcc.x+=(e.clientX-mouse.x)*SENS_M*1.6;lookAcc.y+=(e.clientY-mouse.y)*SENS_M*1.6;}
+    lastTouch=false;
+    if(document.pointerLockElement){lookAcc.x+=e.movementX*SENS_M*mSens;lookAcc.y+=e.movementY*SENS_M*mSens;}
+    else{if(mouseSeen){lookAcc.x+=(e.clientX-mouse.x)*SENS_M*1.5*mSens;lookAcc.y+=(e.clientY-mouse.y)*SENS_M*1.5*mSens;}mouseSeen=true;}
     mouse.x=e.clientX;mouse.y=e.clientY;return;}
-  for(const p of [lookPtr,firePtr]){if(p&&p.id===e.pointerId){lookAcc.x+=(e.clientX-p.x)*SENS_T;lookAcc.y+=(e.clientY-p.y)*SENS_T;p.x=e.clientX;p.y=e.clientY;}}
+  for(const p of [lookPtr,firePtr]){if(p&&p.id===e.pointerId){lookAcc.x+=(e.clientX-p.x)*SENS_T*tSens;lookAcc.y+=(e.clientY-p.y)*SENS_T*tSens;p.x=e.clientX;p.y=e.clientY;}}
   const k=sticks.L;if(k&&k.id===e.pointerId){let dx=e.clientX-k.x,dy=e.clientY-k.y;const d=Math.hypot(dx,dy),R=50;if(d>R){dx*=R/d;dy*=R/d;}k.dx=dx/R;k.dy=dy/R;stickEl().firstElementChild.style.transform=`translate(${dx}px,${dy}px)`;}
 });
 function endPtr(e){
@@ -1165,9 +1178,10 @@ function endPtr(e){
 }
 addEventListener('pointerup',endPtr);addEventListener('pointercancel',endPtr);
 addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('mouseout',e=>{if(!e.relatedTarget)mouseSeen=false;});
 document.addEventListener('pointerlockchange',()=>{const l=!!document.pointerLockElement;if(!l&&wasLocked){lockLostAt=performance.now();if(state==='play')togglePause();}wasLocked=l;});
 addEventListener('wheel',e=>{if(state==='play'&&Math.abs(e.deltaY)>20)swapWeapon();},{passive:true});
-addEventListener('keydown',e=>{keys[e.code]=true;if(state!=='play'&&state!=='paused')return;if(e.code==='KeyR')startReload();if(e.code==='KeyQ')swapWeapon();
+addEventListener('keydown',e=>{keys[e.code]=true;if(state!=='play'&&state!=='paused')return;if(state==='play'&&/^(Key[WASD]|Arrow)/.test(e.code))tryLock();if(e.code==='KeyR')startReload();if(e.code==='KeyQ')swapWeapon();
   if(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'){const i=+e.code.slice(5)-1;if(player.weapons[i])selectWeapon(i);}
   if((e.code==='Escape'||e.code==='KeyP')&&performance.now()-lockLostAt>400)togglePause();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -1212,6 +1226,9 @@ function update(dt){
   const ldx=lookAcc.x,ldy=lookAcc.y;lookAcc.x=0;lookAcc.y=0;
   if(player.hp>0){const fr=vmS.aimB>0.5?0.6:1;player.yaw-=ldx*fr;player.pitch=clamp(player.pitch-ldy*fr,-1.25,1.25);
     if(keys.ArrowLeft)player.yaw+=dt*2.2;if(keys.ArrowRight)player.yaw-=dt*2.2;}
+  if(!lastTouch&&!document.pointerLockElement&&mouseSeen&&player.hp>0){const ex=mouse.x/innerWidth,ey=mouse.y/innerHeight,E=0.07;
+    if(ex<E)player.yaw+=dt*2.6*mSens*(E-ex)/E;else if(ex>1-E)player.yaw-=dt*2.6*mSens*(ex-1+E)/E;
+    if(ey<E)player.pitch=Math.min(1.25,player.pitch+dt*1.4*mSens*(E-ey)/E);else if(ey>1-E)player.pitch=Math.max(-1.25,player.pitch-dt*1.4*mSens*(ey-1+E)/E);}
   {const cy=Math.cos(player.yaw),sy=Math.sin(player.yaw),cp=Math.cos(player.pitch);_fwd.set(-sy*cp,Math.sin(player.pitch),-cy*cp);aimDir.set(-sy,0,-cy);}
   // ---- aim / fire input
   if(aimHeld&&player.hp>0){if(!aiming){aiming=true;aimT=0;}aimT+=dt;}
@@ -1246,7 +1263,7 @@ function update(dt){
   {const f=w.mode==='release'?(aiming?clamp(aimT/w.focus,0,1):0):1;const sp=w.spread+(1-f)*w.spreadLoose+moving*0.012+(w.mode==='auto'&&!aiming?0.02:0);
    const px=sp*(innerHeight/2)/Math.tan(camera.fov*Math.PI/360);
    xh.style.setProperty('--g',Math.max(4,px).toFixed(1)+'px');xh.classList.toggle('steady',w.mode==='release'&&w.pellets===1&&f>=1);}
-  $('lockHint').hidden=lastTouch||!!document.pointerLockElement||mouse.down;
+  $('lockHint').hidden=lastTouch||!!document.pointerLockElement||missionT>12;
 
   // ---- doors
   for(const k in doors){const d=doors[k];
@@ -1522,7 +1539,7 @@ function showMissions(){
 }
 function togglePause(){
   if(state==='play'){prevState=state;state='paused';$('pause').hidden=false;if(AC)AC.suspend();resetInput();}
-  else if(state==='paused'){state=prevState;$('pause').hidden=true;if(AC)AC.resume();clock.getDelta();}
+  else if(state==='paused'){state=prevState;$('pause').hidden=true;if(AC)AC.resume();clock.getDelta();mouseSeen=false;tryLock();}
 }
 $('toMissions').onclick=()=>{initAudio();showMissions();};
 $('cineSkip').onclick=()=>{if(cine){if(cine.onEnd!==missionComplete)skyBlot=0.32;endCine();}};
@@ -1531,6 +1548,10 @@ $('backTitle').onclick=()=>{$('missions').hidden=true;$('title').hidden=false;st
 $('m1').onclick=startMission;$('retryBtn').onclick=startMission;
 $('overMenu').onclick=showMissions;$('winMenu').onclick=showMissions;
 $('quitBtn').onclick=()=>{if(AC)AC.resume();showMissions();};
+for(const [id,get,set,key] of [['mSens',()=>mSens,v=>mSens=v,'msens'],['tSens',()=>tSens,v=>tSens=v,'tsens']]){
+  const el=$(id),out=$(id+'V');el.value=get();out.textContent=(+get()).toFixed(1);
+  el.addEventListener('input',()=>{set(+el.value);out.textContent=(+el.value).toFixed(1);try{localStorage.setItem('tribulation.'+key,el.value);}catch(e){}});
+}
 $('pauseBtn').onclick=togglePause;$('resumeBtn').onclick=togglePause;
 $('reloadBtn').onclick=startReload;$('swapBtn').onclick=swapWeapon;
 $('muteBtn').onclick=()=>{muted=!muted;if(master)master.gain.value=muted?0:0.55;$('muteBtn').textContent='SOUND: '+(muted?'OFF':'ON');};
@@ -1542,6 +1563,7 @@ buildGrid();buildLevel();resize();renderArmory();
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(clock.getDelta(),0.05);
+  document.body.classList.toggle('noCursor',state==='play'&&!lastTouch);
   if(state==='play')update(dt);
   else if(state==='over')deathT=Math.min(1,deathT+dt*1.1);
   else if(state==='cine'){updateCine(dt);if(player){animHuman(player.obj,dt,0,0,-1);allies.forEach(a=>animHuman(a.obj,dt,0,0,-1));}}
