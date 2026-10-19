@@ -576,6 +576,7 @@ function seg(len,r0,r1,mat,jr){const g=new THREE.Group();mk(cyl(r0,r1,len,8),mat
 const texCamo=canvasTex(32,32,(x,w,h)=>{const cols=['#34372f','#2b2d29','#222421','#3c3f37','#30332f','#272a27'];x.fillStyle=cols[0];x.fillRect(0,0,w,h);
   for(let i=0;i<150;i++){x.fillStyle=cols[1+(Math.random()*5|0)];const px=Math.random()*w|0,py=Math.random()*h|0,s=1+(Math.random()*2|0);x.fillRect(px,py,s*2,s);if(Math.random()<.5)x.fillRect(px+s,py+s,s+1,s);}},[2,2]);
 function camoMat(tint){const m=L(tint||0xffffff);m.map=texCamo;return m;}
+function curve(u,pts){for(let i=1;i<pts.length;i++){if(u<=pts[i][0]){const a=pts[i-1],b=pts[i],k=(u-a[0])/(b[0]-a[0]),e=k*k*(3-2*k);return a[1]+(b[1]-a[1])*e;}}return pts[pts.length-1][1];}
 function skinMat(m){const c=m.clone();c.skinning=true;return c;}
 // Smooth deforming body: tubes laid along each bone in its rest pose, weighted to blend into the
 // neighbouring bone near every joint, then bound to the same groups the animation already drives.
@@ -591,7 +592,7 @@ function buildSkin(root,parts){
     const self=bi(p.bone),par=p.parent?bi(p.parent):-1,chi=p.child?bi(p.child):-1,bl=p.blend||0.28;
     for(let j=0;j<=H;j++){const u=j/H,y=(p.y0||0)-u*p.len,r=p.prof?p.prof(u):lerp(p.r0,p.r1,u);
       for(let k=0;k<=R;k++){const a=k/R*TAU,ca=Math.cos(a),sa=Math.sin(a);
-        v.set(sa*r*sx+(p.ox||0),y,ca*r*sz+(p.oz||0)).applyMatrix4(M);
+        v.set(sa*r*sx+(p.ox||0)+(p.oxf?p.oxf(u):0),y,ca*r*sz*(ca<0&&p.back?p.back(u):1)+(p.oz||0)+(p.ozf?p.ozf(u):0)).applyMatrix4(M);
         n.set(sa/sx,0,ca/sz).applyMatrix3(nm).normalize();
         g.pos.push(v.x,v.y,v.z);g.nor.push(n.x,n.y,n.z);g.uv.push(k/R*2,u*p.len*2.5);
         let o=-1,w=0;
@@ -629,16 +630,17 @@ function makeHuman(o){
     const shin=G();shin.position.y=-0.44;thigh.add(shin);
     const foot=G();foot.position.y=-0.43;shin.add(foot);
     if(kit){
-      mk(cyl(0.064,0.058,0.16,10),boot,0,-0.35,0,shin);
-      mk(box(0.11,0.09,0.24),boot,0,-0.03,0.04,foot);mk(sph(0.056,8,6),boot,0,-0.04,0.15,foot).scale.set(1,0.8,1);
-      mk(box(0.12,0.03,0.29),sole,0,-0.08,0.05,foot);
-      const kp=mk(sph(0.07,10,8),black,0,-0.01,0.05,shin);kp.scale.set(1,1.2,0.75);
-      limbBetween(new V3(sd*0.098,-0.04,-0.01),new V3(sd*0.098,-0.4,-0.01),0.014,0.016,metal,thigh);
-      mk(box(0.026,0.08,0.045),gear,sd*0.098,-0.2,-0.01,thigh);
-      const kj=mk(cyl(0.036,0.036,0.03,12),metal,sd*0.09,0,-0.01,shin);kj.rotation.z=Math.PI/2;
+      mk(cyl(0.078,0.068,0.17,10),boot,0,-0.35,0,shin);
+      mk(box(0.13,0.1,0.26),boot,0,-0.03,0.04,foot);mk(sph(0.066,8,6),boot,0,-0.04,0.16,foot).scale.set(1,0.8,1);
+      mk(box(0.14,0.035,0.31),sole,0,-0.085,0.05,foot);
+      const kp=mk(sph(0.08,10,8),black,0,-0.01,0.062,shin);kp.scale.set(1,1.2,0.75);
+      limbBetween(new V3(sd*0.125,-0.04,-0.01),new V3(sd*0.088,-0.4,-0.01),0.014,0.016,metal,thigh);
+      mk(box(0.026,0.08,0.045),gear,sd*0.115,-0.2,-0.01,thigh);
+      const kj=mk(cyl(0.036,0.036,0.03,12),metal,sd*0.085,0,-0.01,shin);kj.rotation.z=Math.PI/2;
       limbBetween(new V3(sd*0.085,-0.03,-0.015),new V3(sd*0.07,-0.36,-0.02),0.015,0.013,metal,shin);
-      mk(cyl(0.066,0.066,0.03,10),gear,0,-0.36,0,shin);
-      if(sd>0){mk(box(0.06,0.13,0.1),gear,0.085,-0.17,0.02,thigh);mk(box(0.064,0.03,0.104),black,0.085,-0.11,0.02,thigh);}
+      mk(cyl(0.078,0.078,0.03,10),gear,0,-0.34,0,shin);
+      if(sd>0){mk(box(0.06,0.14,0.11),gear,0.112,-0.17,0.02,thigh);mk(box(0.064,0.03,0.114),black,0.112,-0.11,0.02,thigh);}
+      else{mk(box(0.05,0.1,0.1),pantsR,-0.11,-0.24,0.0,thigh);}
     }else{
       mk(cyl(0.062,0.056,0.2,8),boot,0,-0.33,0,shin);
       mk(box(0.1,0.09,0.25),boot,0,-0.035,0.05,foot);
@@ -692,13 +694,13 @@ function makeHuman(o){
     const up=G();upper.add(up);const fore=G();upper.add(fore);
     const hand=G();hand.position.set(0,-0.29,0.005);fore.add(hand);
     if(kit){
-      mk(box(0.06,0.09,0.04),black,0,0,0,hand);mk(box(0.062,0.03,0.042),gear,0,0.03,0.002,hand);mk(box(0.02,0.04,0.03),black,sd*-0.035,0.01,0.015,hand);
-      limbBetween(new V3(sd*0.05,-0.04,-0.012),new V3(sd*0.05,-0.26,-0.012),0.012,0.012,metal,up);
-      mk(box(0.024,0.07,0.034),gear,sd*0.056,-0.13,-0.012,up);
-      limbBetween(new V3(sd*0.046,-0.02,-0.006),new V3(sd*0.04,-0.19,0),0.011,0.01,metal,fore);
-      mk(cyl(0.054,0.05,0.05,10),gear,0,-0.21,0,fore);
-      mk(sph(0.05,8,6),black,0,-0.29,-0.01,up).scale.set(1,0.75,0.9);
-      if(sd<0)mk(box(0.04,0.006,0.03),accent,0,-0.195,0.054,fore);
+      mk(box(0.07,0.1,0.05),black,0,0,0,hand);mk(box(0.072,0.032,0.052),gear,0,0.032,0.002,hand);mk(box(0.024,0.05,0.035),black,sd*-0.04,0.01,0.018,hand);
+      limbBetween(new V3(sd*0.088,-0.05,-0.012),new V3(sd*0.068,-0.26,-0.012),0.012,0.012,metal,up);
+      mk(box(0.024,0.07,0.034),gear,sd*0.082,-0.13,-0.012,up);
+      limbBetween(new V3(sd*0.066,-0.02,-0.006),new V3(sd*0.05,-0.19,0),0.011,0.01,metal,fore);
+      mk(cyl(0.056,0.052,0.05,10),gear,0,-0.22,0,fore);
+      mk(sph(0.064,8,6),black,0,-0.29,-0.012,up).scale.set(1,0.75,0.9);
+      if(sd<0)mk(box(0.04,0.006,0.03),accent,0,-0.205,0.058,fore);
     }else mk(box(0.055,0.09,0.032),skin,0,0,0,hand);
     arms.push({up,fore,sd,S:new V3(sd*0.185,0.52,0)});
   }
@@ -707,17 +709,17 @@ function makeHuman(o){
   // the deforming body
   const torsoM=skinMat(kit?camo:coat),legM=skinMat(pantsR),armM=skinMat(kit?camo:coat),foreM=skinMat(kit?camo:skin),neckM=skinMat(kit?black:skin);
   const parts=[
-    {bone:hips,mat:legM,y0:0.08,len:0.24,r0:0.15,r1:0.165,sz:0.72},
-    {bone:upper,mat:torsoM,y0:0.63,len:0.66,sz:0.7,child:hips,blend:0.3,prof:u=>u<0.25?lerp(0.13,0.2,u/0.25):u<0.62?lerp(0.2,0.152,(u-0.25)/0.37):lerp(0.152,0.15,(u-0.62)/0.38)},
+    {bone:hips,mat:legM,y0:0.08,len:0.26,sz:0.76,prof:u=>curve(u,[[0,0.16],[0.5,0.185],[1,0.19]])},
+    {bone:upper,mat:torsoM,y0:0.64,len:0.67,sz:0.72,child:hips,blend:0.3,prof:u=>curve(u,[[0,0.13],[0.12,0.19],[0.3,0.215],[0.55,0.185],[0.75,0.165],[1,0.165]])},
     {bone:head,mat:neckM,y0:0.05,len:0.15,r0:0.05,r1:0.058,child:upper,blend:0.45,rings:4},
   ];
   for(const lg of legs){
-    parts.push({bone:lg.thigh,mat:legM,y0:0.06,len:0.5,parent:hips,child:lg.shin,blend:0.22,prof:u=>lerp(0.09,0.064,u)+Math.sin(u*Math.PI)*0.006});
-    parts.push({bone:lg.shin,mat:legM,y0:0.03,len:0.38,parent:lg.thigh,blend:0.25,prof:u=>lerp(0.064,0.048,u)+Math.sin(Math.min(1,u*2)*Math.PI)*0.006});
+    parts.push({bone:lg.thigh,mat:legM,y0:0.07,len:0.51,parent:hips,child:lg.shin,blend:0.22,rings:10,prof:u=>curve(u,[[0,0.112],[0.15,0.118],[0.45,0.104],[0.8,0.084],[1,0.074]]),oxf:u=>lg.sd*(1-u)*0.012,back:u=>1.08});
+    parts.push({bone:lg.shin,mat:legM,y0:0.03,len:0.4,parent:lg.thigh,blend:0.25,rings:10,prof:u=>curve(u,[[0,0.072],[0.25,0.08],[0.55,0.068],[0.85,0.058],[1,0.06]]),back:u=>1+Math.sin(Math.min(1,u*1.6)*Math.PI)*0.25});
   }
   for(const a of arms){
-    parts.push({bone:a.up,mat:armM,y0:0.05,len:0.34,parent:upper,child:a.fore,blend:0.25,prof:u=>lerp(0.064,0.048,u)});
-    parts.push({bone:a.fore,mat:foreM,y0:0.03,len:0.27,parent:a.up,blend:0.25,prof:u=>lerp(0.049,0.036,u)+Math.sin(Math.min(1,u*1.6)*Math.PI)*0.004});
+    parts.push({bone:a.up,mat:armM,y0:0.06,len:0.35,parent:upper,child:a.fore,blend:0.25,rings:10,prof:u=>curve(u,[[0,0.088],[0.2,0.084],[0.5,0.074],[0.85,0.062],[1,0.06]]),back:u=>1.05});
+    parts.push({bone:a.fore,mat:foreM,y0:0.03,len:0.27,parent:a.up,blend:0.25,rings:8,prof:u=>curve(u,[[0,0.06],[0.25,0.064],[0.7,0.05],[1,0.045]])});
   }
   buildSkin(root,parts);
   const guns={};
