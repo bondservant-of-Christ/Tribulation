@@ -73,12 +73,12 @@ button:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
 #stickR{border-color:rgba(196,42,36,.55)} #stickR i{background:rgba(196,42,36,.4)}
 
 /* Overlays */
-.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:linear-gradient(to bottom, rgba(7,5,5,.25), rgba(7,5,5,.9) 70%);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:calc(16px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-bottom,0px));overflow:auto}
-.panel{max-width:600px;width:100%;display:grid;gap:14px;align-content:center}
+.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-start;justify-content:center;background:linear-gradient(to bottom, rgba(7,5,5,.25), rgba(7,5,5,.9) 70%);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:calc(16px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-bottom,0px));overflow:auto}
+.panel{max-width:600px;width:100%;display:grid;gap:14px;align-content:center;margin:auto}
 .eyebrow{font-size:17px;letter-spacing:.24em;color:var(--brass)}
-h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(56px,15vw,120px);line-height:.8;letter-spacing:.02em;color:var(--bone);text-wrap:balance}
+h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(44px,min(15vw,24vh),120px);line-height:.8;letter-spacing:.02em;color:var(--bone);text-wrap:balance}
 h1 em{font-style:normal;color:var(--blood)}
-h2{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(40px,10vw,72px);line-height:.85;color:var(--bone);text-wrap:balance}
+h2{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(32px,min(10vw,15vh),72px);line-height:.85;color:var(--bone);text-wrap:balance}
 h2 em{font-style:normal;color:var(--blood)}
 blockquote{margin:0;font-family:var(--scripture);font-style:italic;font-size:21px;line-height:1.3;max-width:44ch;color:var(--bone)}
 blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-size:16px;letter-spacing:.14em;color:var(--blood);margin-top:6px}
@@ -119,6 +119,23 @@ body.noCursor #c{cursor:none}
 #fireBtn{pointer-events:auto;position:absolute;right:calc(max(14px,env(safe-area-inset-right,0px)) + 10px);bottom:calc(92px + env(safe-area-inset-bottom,0px));width:88px;height:88px;border-radius:50%;background:rgba(196,42,36,.16);border:2px solid rgba(196,42,36,.7);font-size:19px;letter-spacing:.14em;color:var(--bone);touch-action:none}
 #fireBtn.on{background:rgba(196,42,36,.45)}
 @media (pointer:fine){#fireBtn{display:none}.sideBtns{bottom:auto;top:calc(64px + env(safe-area-inset-top,0px))}}
+@media (max-height:540px){
+  .panel{gap:8px;max-width:760px}
+  h2{font-size:34px}
+  .eyebrow{font-size:14px}
+  blockquote{font-size:16px;line-height:1.25}
+  .panel p{font-size:16px}
+  .controls{font-size:14px}
+  .missions{grid-template-columns:1fr 1fr;gap:6px}
+  .mission{padding:6px 10px;grid-template-columns:30px 1fr}
+  .mission .num{font-size:22px}.mission .t{font-size:17px}.mission .s{font-size:13px}
+  .cta{font-size:22px;padding:8px 22px 6px}
+  .ghost{font-size:16px;padding:6px 12px}
+  .tally{gap:18px}.tally b{font-size:30px}
+  .sens label{font-size:15px;grid-template-columns:120px 1fr 40px}
+  #note{max-width:min(70vw,440px)}#note p{font-size:15px}
+}
+#pause,#over,#win{background:rgba(7,5,5,.97)}
 #cine{position:fixed;inset:0;z-index:15}
 #cine .bar{position:absolute;left:0;right:0;background:#000}
 #cine .barTop{top:0;height:calc(11vh + env(safe-area-inset-top,0px))}
@@ -636,10 +653,10 @@ function armorMat(c){return new THREE.MeshPhongMaterial({color:c,map:texArmor,sh
 function makeOperator(o){
   const F=o.body==='f',SW=F?0.168:0.2,AS=F?0.88:1.14,TS=F?1.05:1.07,PS=F?0.9:1.14;
   const A=armorMat(o.armor||0x34383c),A2=armorMat(o.armor2||0x1c1e20);
-  const suit=camoMat(o.suit||(F?0x232528:0x2f352f)),glove=L(0x17181a),boot=L(0x141516),sole=L(0x2e2f30),rubber=L(0x1d1f21),pouch=L(o.pouch||(F?0x18191b:0x2a2f29)),mag=L(0x26282a);
-  const stripe=L(0x8e9296);
+  const suit=camoMat(o.suit||(F?0x232528:0x2f352f)),glove=L(0x17181a),boot=L(0x141516),sole=L(0x2e2f30),rubber=L(0x1d1f21),pouch=L(o.pouch||(F?0x141516:0x1d1f21)),mag=L(0x26282a);
+  const stripe=L(F?0x7a1712:0x8e9296),redM=L(0x8a1a14);
   const visor=new THREE.MeshPhongMaterial({color:0x0b1216,specular:0x8a9aa8,shininess:90,flatShading:true,emissive:new THREE.Color(o.glow||0xffb040).multiplyScalar(0.06)});
-  const accent=BASIC(o.glow||0xffb040,{fog:false}),eyeG=BASIC(F?(o.glow||0xffb040):0x3dff9a,{fog:false}),cyanB=BASIC(0x4fe0e8,{fog:false});
+  const accent=BASIC(o.glow||0xffb040,{fog:false}),eyeG=BASIC(o.glow||0xd8302a,{fog:false}),cyanB=BASIC(0xff5a3a,{fog:false});
   const G=()=>new THREE.Group();
   const P=(geo,mat,x,y,z,parent,rx,ry,rz)=>{const m=mk(geo,mat,x,y,z,parent);if(rx||ry||rz)m.rotation.set(rx||0,ry||0,rz||0);return m;};
   const DS=m=>{m.material=m.material.clone();m.material.side=THREE.DoubleSide;return m;};
@@ -742,11 +759,13 @@ function makeOperator(o){
       P(rbox(0.16*PS,0.04,0.18*PS,0.008),A,sd*0.03,0.01,0,up,0,0,-sd*0.45);
       P(rbox(0.14*PS,0.035,0.16*PS,0.008),A2,sd*0.06,-0.05,0,up,0,0,-sd*0.3);
       P(rbox(0.12*PS,0.03,0.14*PS,0.008),A,sd*0.07,-0.1,0,up,0,0,-sd*0.18);
+      if(sd<0)P(box(0.03,0.012,0.15*PS),redM,sd*0.04,0.032,0,up,0,0,-sd*0.45);
       P(rbox(0.07,0.07,0.06,0.01),A2,0,-0.29,-0.03,up,0.3);
       P(rbox(0.1*AS,0.15,0.1*AS,0.012),A,0,-0.135,0,fore);
       P(rbox(0.04,0.13,0.03,0.008),A2,sd*0.06,-0.13,0,fore);
     }else{
       P(rbox(0.11,0.035,0.12,0.008),A2,sd*0.03,0.0,0,up,0,0,-sd*0.45);
+      if(sd<0)P(box(0.026,0.01,0.12),redM,sd*0.03,0.022,0,up,0,0,-sd*0.45);
       P(box(0.006,0.22,0.02),stripe,sd*0.058,-0.14,0,up);
       P(rbox(0.085,0.16,0.085,0.012),A,0,-0.135,0,fore);
       P(box(0.004,0.12,0.03),stripe,0,-0.13,0.044,fore);
@@ -1188,9 +1207,9 @@ const vmFlash=new THREE.PointLight(0xffc060,0,2.5,1.5);vmFlash.position.set(0.1,
 function limbBetween(a,b,r0,r1,mat,parent){const d=new V3().subVectors(b,a),len=d.length();const m=new THREE.Mesh(cyl(r1,r0,len,8),mat);m.position.copy(a).addScaledVector(d,0.5);m.quaternion.setFromUnitVectors(new V3(0,1,0),d.normalize());parent.add(m);return m;}
 const VM={};
 (function(){
-  const suit=camoMat(0x26292d),armor=L(0x16181a),metal=L(0x3a3e42),glove=L(0x151719),blk=L(0x1b1d20),poly=L(0x24272a),grey=L(0x30343a),tan=L(0x5a5446),steel=L(0x6a6e70);
-  const red=BASIC(0xff3020,{fog:false}),cyan=BASIC(0x5fd0c8,{fog:false}),lens=BASIC(0xeef4ff,{fog:false});
-  const VA=armorMat(0x34383c),VA2=armorMat(0x1c1e20);
+  const suit=camoMat(0x1e2022),armor=L(0x16181a),metal=L(0x3a3e42),glove=L(0x151719),blk=L(0x1b1d20),poly=L(0x24272a),grey=L(0x30343a),tan=L(0x5a5446),steel=L(0x6a6e70);
+  const red=BASIC(0xff3020,{fog:false}),cyan=BASIC(0xd8302a,{fog:false}),lens=BASIC(0xeef4ff,{fog:false});
+  const VA=armorMat(0x2a2c2e),VA2=armorMat(0x151617);
   const hand=(p,parent,sc=1)=>{const h=new THREE.Group();h.position.copy(p);mk(rbox(0.07*sc,0.06*sc,0.095*sc,0.014),glove,0,0,0,h);mk(rbox(0.026,0.024,0.05,0.008),glove,0.03,0.01,-0.03,h);mk(rbox(0.066,0.016,0.03,0.006),VA2,0,0.03,-0.02,h);parent.add(h);return h;};
   const arm=(a,b,parent,wrist)=>{limbBetween(a,b,0.046,0.056,suit,parent);
     limbBetween(a.clone().lerp(b,0.08),a.clone().lerp(b,0.42),0.057,0.063,VA,parent);
@@ -1300,15 +1319,15 @@ let kills=0,shake=0,hurtT=0,t=0,missionT=0,stage=0,consoleHold=0,boss=null,secre
 let trail=[],aimT=0,aiming=false,lastAim=new V3(0,0,-1);
 const camTarget=new V3(),aimDir=new V3(0,0,-1);
 const ALLY_DEF=[
-  {name:'CALEB',armor:0x3a4030,armor2:0x1d201b,glow:0xff7a3a},
-  {name:'HANNAH',armor:0x2c3035,armor2:0x141517,glow:0xffc04a,body:'f'},
-  {name:'JONAH',armor:0x4e4536,armor2:0x221f1a,glow:0x5fd0c8}
+  {name:'CALEB',armor:0x2e3032,armor2:0x161718,glow:0xd8302a,suit:0x1f2123},
+  {name:'HANNAH',armor:0x1e1f21,armor2:0x101112,glow:0xe0342c,body:'f',suit:0x18191b},
+  {name:'JONAH',armor:0x3a3c3f,armor2:0x1b1c1e,glow:0xc8281f,suit:0x232528}
 ];
 const OBJ=['Get inside the facility','Restart the yard generator','Search the offices for the shaft key','Reach the shaft past the red door','Call the lift up','The lift is coming'];
 let laser;
 
 function makePlayer(){
-  const o=makeHuman({armor:0x34383c,armor2:0x1c1e20,glow:0xffb040,guns:['pistol','long']});scene.add(o);
+  const o=makeHuman({armor:0x2a2c2e,armor2:0x151617,glow:0xd8302a,suit:0x1e2022,guns:['pistol','long']});scene.add(o);
   const w=['witness',...armory.filter(a=>WEAP[a])];
   const mags={};w.forEach(k=>mags[k]=WEAP[k].mag);
   return {obj:o,pos:o.position,hp:100,max:100,weapons:w,cur:0,mags,ammo:{p:16,s:armory.includes('jericho')?8:0,r:armory.includes('thunders')?60:0},keys:{},cd:0,reload:0,walk:0,isPlayer:true,yaw:0,pitch:0,kick:0,moveAmt:0,
@@ -1317,7 +1336,7 @@ function makePlayer(){
       if(this.hp<=0){this.hp=0;gameOver();}}};
 }
 function makeAlly(def){
-  const o=makeHuman({armor:def.armor,armor2:def.armor2,glow:def.glow,body:def.body,guns:['long']});scene.add(o);
+  const o=makeHuman({armor:def.armor,armor2:def.armor2,glow:def.glow,body:def.body,suit:def.suit,guns:['long']});scene.add(o);
   return {obj:o,pos:o.position,name:def.name,hp:100,max:100,cd:rand(0,.5),mag:20,reload:0,downed:false,revive:0,walk:0,
     hurt(d,src){if(this.downed)return;this.hp-=d;this.obj.userData.flinch=1;if(this.hp<=0){this.hp=0;this.downed=true;this.revive=0;sfx.down();radio([this.name,'I\u2019m hit! Get me up!'],true);}}};
 }
