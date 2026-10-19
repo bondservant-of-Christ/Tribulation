@@ -668,8 +668,7 @@ function makeOperator(o){
   const upper=G();upper.position.y=0.98;rig.add(upper);
   // --- torso armor
   if(F){
-    P(rbox(0.29,0.2,0.06,0.03),A,0,0.47,0.112,upper,-0.1);
-    for(const sd of[-1,1]){const b=P(new THREE.SphereGeometry(0.082,14,10),A,sd*0.068,0.455,0.15,upper,-0.25,sd*0.25);b.scale.set(1,0.86,0.72);}
+    P(rbox(0.29,0.23,0.072,0.035),A,0,0.462,0.122,upper,-0.17);
     for(let i=0;i<3;i++)P(rbox(0.2-i*0.012,0.05,0.036,0.012),A2,0,0.315-i*0.06,0.118-i*0.004,upper);
   }else{
     P(rbox(0.39,0.25,0.08,0.03),A,0,0.47,0.138,upper,-0.12);
