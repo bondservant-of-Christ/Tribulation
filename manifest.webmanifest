@@ -1,9 +1,9 @@
 {
-  "id": "/Tribulation/",
+  "id": "/Tribulation/?app=tribulation-2",
   "name": "Tribulation",
   "short_name": "Tribulation",
   "description": "A first-person PS2-style horror shooter.",
-  "start_url": "/Tribulation/",
+  "start_url": "/Tribulation/?app=tribulation-2",
   "scope": "/Tribulation/",
   "display": "standalone",
   "orientation": "any",
