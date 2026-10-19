@@ -427,12 +427,12 @@ function buildGrid(){
     ['E',19.5,5.6]
   ];
   fixtures=[
-    [11,32,0xffb070,1],[27,41,0xffb070,1],[31,35.2,0xffc070],
+    [11,32,0xffb070,1],[27,41,0xffb070,1],[31,34,0xffc070,2],
     [19.5,26,0xdfe6ff],[19.5,20,0xff5040],[19.5,14,0xdfe6ff],[15,14,0xdfe6ff],[24,14,0xdfe6ff],
     [5,14,0xff4030],[10,14,0xff4030],[5.5,10,0xd8e0ff],[5.5,18.5,0xffc890],
     [29,14,0xff4030],[35,14,0xff4030],[31,19.5,0xdfe6ff],[35,21,0xdfe6ff],[32.5,10.5,0x5a7aff],
     [19.5,8.5,0xff4030],[14,3,0xff3020],[25,3,0xff3020],[19.5,3.5,0xff2010]
-  ].map(([x,y,c,out])=>({x:(x+0.5)*S,z:(y+0.5)*S,c,out:!!out,on:!!out}));
+  ].map(([x,y,c,out])=>({x:(x+0.5)*S,z:(y+0.5)*S,c,out:out===1,gen:out===2,on:out===1,ly:out===1?4.2:out===2?2.1:2.3}));
 }
 const tw=t=>(t+0.5)*S;
 const tileAt=(x,z)=>[Math.floor(x/S),Math.floor(z/S)];
@@ -441,10 +441,14 @@ function doorAt(tx,ty){return doors[ty*GW+tx];}
 function solidAt(tx,ty){const c=cell(tx,ty);if(c==='#'||c==='c'||c==='x'||c==='T'||c==='V'||c==='q')return true;if(c==='D'||c==='R'||c==='B'||c==='G'){const d=doorAt(tx,ty);return !d||d.open<0.85;}return false;}
 function walkable(tx,ty){const c=cell(tx,ty);if(c==='.'||c===',')return true;if(c==='D')return true;if(c==='R'||c==='B'||c==='G'){const d=doorAt(tx,ty);return d&&d.unlocked;}return false;}
 
+let lamps=[],floods=[];
+const shardMat=BASIC(0xdfe8ec);
+function shatter(x,y,z){sfx.glass();for(let i=0;i<10;i++){const m=new THREE.Mesh(partGeo,i%3?shardMat:bulletMatP);m.position.set(x,y,z);m.scale.setScalar(rand(0.2,0.45));scene.add(m);parts.push({m,v:new V3(rand(-2.5,2.5),rand(-1,2.5),rand(-2.5,2.5)),life:rand(0.6,1.1)});}}
+function breakFixture(f,x,y,z){if(f.broken)return;f.broken=true;f.on=false;if(f.head)f.head.material.color.setHex(0x1a1a1a);shatter(x,y,z);}
 function buildLevel(){
   if(levelGroup)scene.remove(levelGroup);
   levelGroup=new THREE.Group();scene.add(levelGroup);
-  doors={};crackHP={};
+  doors={};crackHP={};lamps=[];floods.forEach(fl=>{fl.spot.intensity=0;});floods=[];
   // floor
   const ft=texFloor.clone();ft.needsUpdate=true;ft.wrapS=ft.wrapT=THREE.RepeatWrapping;ft.repeat.set(GW,30);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(GW*S,30*S),new THREE.MeshPhongMaterial({shininess:4,specular:0x0a0a0a,map:ft}));
@@ -490,9 +494,33 @@ function buildLevel(){
   fixtures.forEach(f=>{
     const d=new THREE.Mesh(new THREE.PlaneGeometry(4.2,4.2),new THREE.MeshBasicMaterial({map:texGlow,color:f.c,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false}));
     d.rotation.x=-Math.PI/2;d.position.set(f.x,0.03,f.z);levelGroup.add(d);f.decal=d;f.flick=Math.random()<.3;d.visible=f.on;
-    if(!f.out){f.lamp=mk(box(1.3,0.05,0.26),BASIC(f.c),f.x,WH-0.03,f.z,levelGroup);f.lamp.castShadow=false;}
-    if(f.out){mk(cyl(0.08,0.1,4.5,6),L(0x2a2a28),f.x-1.2,2.25,f.z-1.2,levelGroup);mk(box(0.5,0.3,0.4),BASIC(0xffd8a0),f.x-1.2,4.5,f.z-1.2,levelGroup);}
+    f.broken=false;
+    if(f.gen){
+      mk(cyl(0.03,0.03,0.35,6),L(0x2a2a28),f.x-0.6,1.57,f.z-0.4,levelGroup);
+      mk(box(0.34,0.16,0.24),L(0x3a3a34),f.x-0.6,1.8,f.z-0.4,levelGroup);
+      f.lamp=mk(box(0.26,0.1,0.02),BASIC(f.c),f.x-0.6,1.8,f.z-0.27,levelGroup);f.lamp.castShadow=false;
+      lamps.push({x:f.x-0.6,y:1.8,z:f.z-0.35,hx:0.22,hy:0.14,hz:0.2,hit:()=>breakFixture(f,f.x-0.6,1.8,f.z-0.27)});
+    }else if(!f.out){
+      f.lamp=mk(box(1.3,0.05,0.26),BASIC(f.c),f.x,WH-0.03,f.z,levelGroup);f.lamp.castShadow=false;
+      lamps.push({x:f.x,y:WH-0.05,z:f.z,hx:0.7,hy:0.16,hz:0.18,hit:()=>breakFixture(f,f.x,WH-0.08,f.z)});
+    }else{
+      mk(cyl(0.08,0.1,4.5,6),L(0x2a2a28),f.x-0.5,2.25,f.z-0.5,levelGroup);
+      f.head=mk(box(0.5,0.3,0.4),BASIC(0xffd8a0),f.x-0.5,4.5,f.z-0.5,levelGroup);f.head.castShadow=false;
+      lamps.push({x:f.x-0.5,y:4.5,z:f.z-0.5,hx:0.32,hy:0.22,hz:0.26,hit:()=>breakFixture(f,f.x-0.5,4.4,f.z-0.5)});
+    }
   });
+  // sodium floodlights flanking the gate: on before the power, so the way in is visible
+  for(const [tx,ty] of [[16,31],[23,31]]){
+    const x=tw(tx),z=tw(ty),hy=5.2,tgt=new V3(50,0.4,73.5);
+    mk(cyl(0.09,0.12,hy,6),L(0x2a2a28),x,hy/2,z,levelGroup);
+    const head=mk(box(0.7,0.4,0.35),BASIC(0xffd08a,{fog:false}),x,hy,z,levelGroup);head.castShadow=false;head.lookAt(tgt);
+    const spot=new THREE.SpotLight(0xffc27a,4.2,30,0.55,0.6,1.2);spot.position.set(x,hy,z);spot.target.position.copy(tgt);levelGroup.add(spot,spot.target);
+    const dir=new V3().subVectors(tgt,new V3(x,hy,z)),len=dir.length();
+    const beam=new THREE.Mesh(new THREE.ConeGeometry(2.6,len,16,1,true),new THREE.MeshBasicMaterial({color:0xffc27a,transparent:true,opacity:.045,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+    beam.position.set(x,hy,z).addScaledVector(dir,0.5);beam.quaternion.setFromUnitVectors(new V3(0,-1,0),dir.clone().normalize());levelGroup.add(beam);
+    const fl={spot,head,beam,broken:false};floods.push(fl);
+    lamps.push({x,y:hy,z,hx:0.45,hy:0.3,hz:0.4,hit:()=>{if(fl.broken)return;fl.broken=true;spot.intensity=0;beam.visible=false;head.material.color.setHex(0x1a1a1a);shatter(x,hy,z);}});
+  }
   // pipes along a few walls for texture
   [[14.1,12,14.1,16],[25.9,12,25.9,16],[2.1,8,2.1,12],[37.9,16,37.9,23]].forEach(([x0,y0,x1,y1])=>{
     const len=Math.abs(y1-y0+1)*S;const p=mk(cyl(0.12,0.12,len,6),L(0x3c4a48),x0*S,1.9,(y0+y1+1)/2*S,levelGroup);p.rotation.x=Math.PI/2;
@@ -855,6 +883,7 @@ const sfx={
   denied(){tone(200,180,0.12,'square',0.1);tone(150,140,0.18,'square',0.1,0.14);},
   buzz(){tone(140,190,0.3,'sawtooth',0.03);},
   wall(){noise(0.6,200,0.5,0.6);tone(70,30,0.5,'sawtooth',0.15);},
+  glass(){noise(0.3,4200,1.2,0.45);tone(2400,900,0.18,'triangle',0.06);noise(0.5,1800,0.8,0.12,0.08);},
   bite(){noise(0.12,900,1.2,0.35);tone(240,120,0.1,'sawtooth',0.08);},
   growl(){tone(85,70,0.9,'sawtooth',0.12);noise(0.8,300,2,0.12);},
   howl(){tone(380,560,0.8,'sine',0.06);tone(560,430,1.4,'sine',0.06,0.8);},
@@ -1155,6 +1184,8 @@ function hitscan(muzzleP,fwd,spread,range,dmg,breaker){
   let hitE=null,hitA=null,headA=false,kind='none';
   for(let s=0.3;s<range;s+=0.15){
     _hp.copy(camera.position).addScaledVector(_hd,s);
+    if(_hp.y>1.5){let hl=null;for(const lp of lamps){if(lp.dead)continue;if(Math.abs(_hp.x-lp.x)<lp.hx&&Math.abs(_hp.y-lp.y)<lp.hy&&Math.abs(_hp.z-lp.z)<lp.hz){hl=lp;break;}}
+      if(hl){hl.dead=true;hl.hit();kind='lamp';break;}}
     if(_hp.y<0.01){kind='floor';break;}
     if(_hp.y>WH&&_hp.z<30*S){kind='ceil';break;}
     const [tx,ty]=tileAt(_hp.x,_hp.z);
@@ -1527,7 +1558,7 @@ function update(dt){
     if(gd<2.6&&player.hp>0)genHold+=dt;else genHold=Math.max(0,genHold-dt);
     if(genHold>=2.5){genHold=0;setObjective(2);sfx.power();shake=0.3;genObj.userData.lamp.material.color.setHex(0xffc070);
       for(const k in doors)if(doors[k].type==='G')doors[k].unlocked=true;
-      fixtures.forEach(f=>{if(!f.out)setTimeout(()=>{f.on=true;},300+Math.random()*1500);});
+      fixtures.forEach(f=>{if(!f.out)setTimeout(()=>{if(!f.broken)f.on=true;},300+Math.random()*1500);});
       radio(['JONAH','Power\u2019s up. Gate\u2019s open. Nobody\u2019s come out to see why.']);
       events.push({t:3,fn:()=>{[[8,44],[20,44],[28,44],[33,42]].forEach(([x,y])=>{const w=spawnEnemy('wolf',tw(x),tw(y));w.home={x:tw(x),z:tw(y)};w.mode='circle';w.modeT=rand(0.4,1.4);w.aggro=true;});sfx.howl();radio(['HANNAH','Behind us! Treeline!'],true);}});}
   }
@@ -1564,7 +1595,7 @@ function updateAmbient(dt){
   // light pool: assign nearest fixtures
   if(fixtures){const ref=state==='play'||state==='paused'||state==='over'||state==='win'?player.pos:camTarget;
     const sorted=fixtures.filter(f=>f.on).map(f=>({f,d:(f.x-ref.x)**2+(f.z-ref.z)**2})).sort((a,b)=>a.d-b.d);
-    lightPool.forEach((l,i)=>{const s=sorted[i];if(!s){l.intensity=0;return;}l.position.set(s.f.x,2.3,s.f.z);l.color.setHex(s.f.c);
+    lightPool.forEach((l,i)=>{const s=sorted[i];if(!s){l.intensity=0;return;}l.position.set(s.f.x,s.f.ly||2.3,s.f.z);l.color.setHex(s.f.c);
       let k=1.0;if(s.f.flick)k*=(Math.sin(t*23+i)>0.85||Math.sin(t*3.1+i*2)>0.97)?0.2:1;l.intensity=k;});
     fixtures.forEach(f=>{f.decal.visible=f.on;const off=f.flick&&Math.sin(t*23)>0.85;if(f.flick)f.decal.material.opacity=off?0.03:0.12;if(f.lamp)f.lamp.material.color.setHex(f.on&&!off?f.c:0x1c1c1c);});}
   if(bannerT>0){bannerT-=dt;if(bannerT<=0)$('banner').style.opacity=0;}
@@ -1584,7 +1615,7 @@ function updateCamera(dt){
     camera.position.set(cx,4.5,86);camera.lookAt(50,26,-30);camTarget.set(cx,0,84);
     flashlight.position.set(50,7,80);flashlight.target.position.set(50,0,70);return;
   }
-  scene.fog.near=6;scene.fog.far=20;hemi.intensity=0.09;
+  {const ok=clamp((player.pos.z-72)/8,0,1);scene.fog.near=lerp(6,10,ok);scene.fog.far=lerp(20,40,ok);}hemi.intensity=0.09;
   setFov(lerp(72,56,vmS.aimB));
   shake=Math.max(0,shake-dt*2.2);const s=shake*shake;
   const dk=ss(deathT),mv=state==='play'?player.moveAmt:0;
