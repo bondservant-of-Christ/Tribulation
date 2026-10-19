@@ -191,7 +191,7 @@ body.noCursor #c{cursor:none}
     <div class="eyebrow">REMNANT MILITIA · THE YEAR OF TRUMPETS</div>
     <h1>Tribu&shy;lation</h1>
     <blockquote>Eleven days ago the drill at Site 9 stopped. Three days ago the mine stopped answering. Tonight the stars over the ridge started going out.</blockquote>
-    <div class="row"><button class="cta" id="toMissions">MISSIONS</button><button class="ghost fsBtn" hidden>FULLSCREEN</button></div>
+    <button class="cta" id="toMissions">MISSIONS</button>
     <div class="controls">
       <span>Left thumb: move · Drag the right side: look</span>
       <span>Hold AIM to raise. Sidearms fire when you let go, and a steady hold hits harder. Automatics fire while held.</span>
@@ -225,7 +225,7 @@ body.noCursor #c{cursor:none}
       <label for="mSens">MOUSE LOOK<input type="range" id="mSens" min="0.3" max="3" step="0.1" value="1"><output id="mSensV">1.0</output></label>
       <label for="tSens">TOUCH LOOK<input type="range" id="tSens" min="0.3" max="3" step="0.1" value="1"><output id="tSensV">1.0</output></label>
     </div>
-    <div class="row"><button class="cta" id="resumeBtn">RESUME</button><button class="ghost" id="muteBtn">SOUND: ON</button><button class="ghost" id="quitBtn">ABANDON MISSION</button><button class="ghost fsBtn" hidden>FULLSCREEN</button></div>
+    <div class="row"><button class="cta" id="resumeBtn">RESUME</button><button class="ghost" id="muteBtn">SOUND: ON</button><button class="ghost" id="quitBtn">ABANDON MISSION</button></div>
   </div>
 </div>
 
@@ -1991,11 +1991,7 @@ for(const [id,get,set,key] of [['mSens',()=>mSens,v=>mSens=v,'msens'],['tSens',(
   const el=$(id),out=$(id+'V');el.value=get();out.textContent=(+get()).toFixed(1);
   el.addEventListener('input',()=>{set(+el.value);out.textContent=(+el.value).toFixed(1);try{localStorage.setItem('tribulation.'+key,el.value);}catch(e){}});
 }
-{const installed=matchMedia('(display-mode: fullscreen)').matches||matchMedia('(display-mode: standalone)').matches||navigator.standalone;
- const canFS=!!document.documentElement.requestFullscreen&&!installed;
- const sync=()=>document.querySelectorAll('.fsBtn').forEach(b=>{b.hidden=!canFS;b.textContent=document.fullscreenElement?'EXIT FULLSCREEN':'FULLSCREEN';});
- document.querySelectorAll('.fsBtn').forEach(b=>b.onclick=()=>{try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>{});}catch(e){}});
- document.addEventListener('fullscreenchange',sync);sync();}
+try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}
 // keep the phone awake while a mission is running (cutscenes have no touches)
 let wakeLock=null;
 async function keepAwake(on){try{
