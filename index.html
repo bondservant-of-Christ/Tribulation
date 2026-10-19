@@ -1996,6 +1996,15 @@ for(const [id,get,set,key] of [['mSens',()=>mSens,v=>mSens=v,'msens'],['tSens',(
  const sync=()=>document.querySelectorAll('.fsBtn').forEach(b=>{b.hidden=!canFS;b.textContent=document.fullscreenElement?'EXIT FULLSCREEN':'FULLSCREEN';});
  document.querySelectorAll('.fsBtn').forEach(b=>b.onclick=()=>{try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>{});}catch(e){}});
  document.addEventListener('fullscreenchange',sync);sync();}
+// keep the phone awake while a mission is running (cutscenes have no touches)
+let wakeLock=null;
+async function keepAwake(on){try{
+  if(on){if(!wakeLock&&navigator.wakeLock&&document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}}
+  else if(wakeLock){const w=wakeLock;wakeLock=null;await w.release();}
+}catch(e){wakeLock=null;}}
+setInterval(()=>keepAwake(state==='play'||state==='cine'||state==='paused'),2000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')keepAwake(state==='play'||state==='cine'||state==='paused');});
+addEventListener('pointerdown',()=>keepAwake(state==='play'||state==='cine'||state==='paused'),{passive:true});
 $('pauseBtn').onclick=togglePause;$('resumeBtn').onclick=togglePause;
 $('reloadBtn').onclick=startReload;$('swapBtn').onclick=swapWeapon;
 $('muteBtn').onclick=()=>{muted=!muted;if(master)master.gain.value=muted?0:0.55;$('muteBtn').textContent='SOUND: '+(muted?'OFF':'ON');};
