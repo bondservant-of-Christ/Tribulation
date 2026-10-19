@@ -573,8 +573,10 @@ function limb(len,r0,r1,mat){const g=new THREE.Group();mk(cyl(r0,r1,len,7),mat,0
 // ---- articulated human: hips -> legs, waist -> torso -> neck -> head, arms solved by 2-bone IK onto the weapon
 const DOWN=new V3(0,-1,0),_D=new V3(),_P=new V3(),_E=new V3(),_U=new V3(),_T=new V3(),_LH=new V3(),_RH=new V3();
 function seg(len,r0,r1,mat,jr){const g=new THREE.Group();mk(cyl(r0,r1,len,8),mat,0,-len/2,0,g);if(jr)mk(sph(jr,8,6),mat,0,0,0,g);return g;}
-const texCamo=canvasTex(32,32,(x,w,h)=>{const cols=['#34372f','#2b2d29','#222421','#3c3f37','#30332f','#272a27'];x.fillStyle=cols[0];x.fillRect(0,0,w,h);
-  for(let i=0;i<150;i++){x.fillStyle=cols[1+(Math.random()*5|0)];const px=Math.random()*w|0,py=Math.random()*h|0,s=1+(Math.random()*2|0);x.fillRect(px,py,s*2,s);if(Math.random()<.5)x.fillRect(px+s,py+s,s+1,s);}},[2,2]);
+const texCamo=canvasTex(32,32,(x,w,h)=>{x.fillStyle='#e6e6e6';x.fillRect(0,0,w,h);
+  for(let i=0;i<220;i++){const v=200+(Math.random()*55|0);x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(Math.random()*w|0,Math.random()*h|0,1+(Math.random()*2|0),1);}
+  x.fillStyle='rgba(0,0,0,.18)';x.fillRect(0,15,w,1);x.fillRect(15,0,1,h);
+  x.fillStyle='rgba(0,0,0,.08)';for(let i=0;i<5;i++){const yy=Math.random()*h|0;x.fillRect(0,yy,w,1);}},[2,2]);
 function camoMat(tint){const m=L(tint||0xffffff);m.map=texCamo;return m;}
 function curve(u,pts){for(let i=1;i<pts.length;i++){if(u<=pts[i][0]){const a=pts[i-1],b=pts[i],k=(u-a[0])/(b[0]-a[0]),e=k*k*(3-2*k);return a[1]+(b[1]-a[1])*e;}}return pts[pts.length-1][1];}
 function skinMat(m){const c=m.clone();c.skinning=true;return c;}
@@ -613,7 +615,7 @@ function buildSkin(root,parts){
 }
 function makeHuman(o){
   const kit=!o.zombie;
-  const camo=camoMat(o.tint||0xd8dcd6),skin=L(o.skin||0xd0b9a0),pantsR=kit?camo:L(o.pants||0x1e1c1a);
+  const camo=camoMat(o.tint||0x4e5248),skin=L(o.skin||0xd0b9a0),pantsR=kit?camo:L(o.pants||0x1e1c1a);
   const black=L(0x141617),gear=L(0x1e2124),metal=L(0x26292c),boot=L(0x111213),sole=L(0x3a3c3c),lensM=L(0x0b0f12);
   const accent=BASIC(o.glow||0xffb040,{fog:false});
   const coat=L(o.coat||0x4e4a44);
@@ -781,6 +783,15 @@ function animHuman(o,dt,move,aimT,reload){
   u.aimB+=(aimT-u.aimB)*Math.min(1,dt*9);
   u.recoil=Math.max(0,u.recoil-dt*7);
   if(u.lunge>0)u.lunge-=dt;
+  // idle fidgets for the living: weight shift, sight check, look back, gear adjust
+  if(!u.zombie){
+    u.fidT=(u.fidT===undefined?rand(2,6):u.fidT)-dt;
+    if(u.fidT<=0&&!u.fid&&m<0.15&&aimT<0.5&&reload<0){const r=Math.random();u.fid={type:r<0.3?'shift':r<0.55?'check':r<0.8?'back':'adjust',t:0,d:r<0.3?2.6:r<0.55?1.5:r<0.8?1.8:1.1,dir:Math.random()<0.5?-1:1};u.fidT=rand(4,9);}
+    if(u.fid){u.fid.t+=dt;if(u.fid.t>=u.fid.d||m>0.3||aimT>0.6)u.fid=null;}
+  }
+  const fk=u.fid?Math.sin(Math.PI*clamp(u.fid.t/u.fid.d,0,1)):0,ft=u.fid?u.fid.type:'';
+  if(ft==='check')aimT=Math.max(aimT,fk);
+  u.flinch=Math.max(0,(u.flinch||0)-dt*4);u.talkT=Math.max(0,(u.talkT||0)-dt);
   const carryT=(reload>=0||u.zombie)?0:clamp(m*1.8,0,1)*(1-clamp(aimT,0,1));
   u.carry=(u.carry||0)+(carryT-(u.carry||0))*Math.min(1,dt*5);
   const stride=u.zombie?0.3:lerp(0.42,0.62,run)*(1-u.aimB*0.35);
@@ -797,7 +808,7 @@ function animHuman(o,dt,move,aimT,reload){
   const s=Math.sin(u.p),c=Math.cos(u.p),breathe=Math.sin(u.t*(1.6+run*1.4));
   const bounce=Math.abs(c);
   u.hips.position.y=0.95-0.03*m-0.03*run+bounce*lerp(0.03,0.06,run)*m-u.aimB*0.04-(u.zombie?0:0.025);
-  u.hips.position.x=Math.sin(u.t*0.55)*0.014*(1-m)+s*0.012*m;
+  u.hips.position.x=Math.sin(u.t*0.55)*0.014*(1-m)+s*0.012*m+(ft==='shift'?u.fid.dir*0.035*fk:0);
   u.hips.rotation.y=s*lerp(0.12,0.16,run)*m;u.hips.rotation.z=Math.sin(u.t*0.55)*0.02*(1-m)-s*0.035*m;
   if(u.hips.userData.skirt){const sk=u.hips.userData.skirt;sk.rotation.x=-Math.abs(s)*0.14*m-run*0.08;sk.rotation.z=s*0.06*m;}
   u.upper.position.y=u.hips.position.y+0.03;u.upper.position.x=u.hips.position.x*0.6;
@@ -807,8 +818,17 @@ function animHuman(o,dt,move,aimT,reload){
   u.upper.rotation.z=u.zombie?Math.sin(u.t*0.8)*0.12:-u.hips.rotation.z*0.7;
   u.lookT-=dt;if(u.lookT<=0){u.lookT=rand(2,5);u.look=m>0.2||u.aimB>0.5?0:rand(-0.7,0.7);}
   if(m>0.2||u.aimB>0.5)u.look=0;
-  u.head.rotation.y+=((u.zombie?0:u.look)-u.head.rotation.y-u.upper.rotation.y*0.8)*Math.min(1,dt*4);
-  u.head.rotation.x=u.zombie?0.25+Math.sin(u.t*0.7)*0.1:-u.aimB*0.05-u.upper.rotation.x*0.7-bounce*0.025*m;
+  let hy=u.headYawT!==undefined?u.headYawT:u.look;
+  if(ft==='back')hy=u.fid.dir*1.25*fk;
+  hy=clamp(hy,-1.4,1.4);
+  // the torso turns part of the way with the head, so the rifle follows the look
+  u.twist=(u.twist||0)+((u.zombie?0:hy*0.42)-(u.twist||0))*Math.min(1,dt*3.5);
+  u.upper.rotation.y+=u.twist+(u.flinch>0?Math.sin(u.t*40)*0.06*u.flinch:0);
+  u.upper.rotation.x-=u.flinch*0.25;
+  if(ft==='shift')u.upper.rotation.z+=-u.fid.dir*0.04*fk;
+  u.head.rotation.y+=((u.zombie?0:hy-u.twist)-u.head.rotation.y-u.upper.rotation.y*0.25+u.twist*0.25)*Math.min(1,dt*6);
+  const nod=u.talkT>0?Math.sin(u.t*7)*0.07*Math.min(1,u.talkT):0;
+  u.head.rotation.x=u.zombie?0.25+Math.sin(u.t*0.7)*0.1:-u.aimB*0.05-u.upper.rotation.x*0.7-bounce*0.025*m+(u.headPitchT||0)+nod+(ft==='adjust'?0.35*fk:0);
   u.head.rotation.z=u.zombie?0.4+Math.sin(u.t*0.9)*0.2:-u.upper.rotation.z*0.5;
   const [aR,aL]=u.arms[0].sd>0?[u.arms[0],u.arms[1]]:[u.arms[1],u.arms[0]];
   const g=u.guns[u.gunType];
@@ -817,7 +837,8 @@ function animHuman(o,dt,move,aimT,reload){
   if(g){
     const P=POSE[u.gunType],C=CARRY[u.gunType],k=u.aimB,cb=u.carry*u.carry*(3-2*u.carry);
     const bob=bounce*0.015*m;
-    let px=lerp(P.low.p[0],P.aim.p[0],k),py=lerp(P.low.p[1],P.aim.p[1],k)+bob,pz=lerp(P.low.p[2],P.aim.p[2],k)-u.recoil*0.07;
+    const sway=(1-k)*(1-m);
+    let px=lerp(P.low.p[0],P.aim.p[0],k)+Math.sin(u.t*1.3)*0.008*sway,py=lerp(P.low.p[1],P.aim.p[1],k)+bob+Math.cos(u.t*1.7)*0.007*sway+breathe*0.006,pz=lerp(P.low.p[2],P.aim.p[2],k)-u.recoil*0.07;
     let rx=lerp(P.low.r[0],P.aim.r[0],k)-u.recoil*0.3,ry=lerp(P.low.r[1],P.aim.r[1],k),rz=lerp(P.low.r[2],P.aim.r[2],k);
     // carry: weapon rides in the right hand and swings with the arm
     const cx=C.p[0],cy=C.p[1]+run*0.05+Math.max(0,swR)*0.05*m,cz=C.p[2]+swR*pump*0.8;
@@ -828,6 +849,7 @@ function animHuman(o,dt,move,aimT,reload){
     _RH.copy(g.userData.rh).applyQuaternion(g.quaternion).add(g.position);
     _LH.copy(g.userData.lh).applyQuaternion(g.quaternion).add(g.position);
     if(env>0){const k2=clamp(env*1.6,0,1);_LH.lerp(BELT,k2);}
+    if(ft==='adjust'){_LH.lerp(BELT,clamp(fk*1.4,0,1));}
     // free left hand: natural swing, elbow bending more as the pace picks up
     _T.set(-0.25+Math.max(0,swL)*0.05*m,lerp(0.0,0.14,run)*m+0.02+Math.max(0,swL)*lerp(0.08,0.18,run)*m,0.03+swL*pump);
     _LH.lerp(_T,cb);
@@ -971,7 +993,7 @@ const vmFlash=new THREE.PointLight(0xffc060,0,2.5,1.5);vmFlash.position.set(0.1,
 function limbBetween(a,b,r0,r1,mat,parent){const d=new V3().subVectors(b,a),len=d.length();const m=new THREE.Mesh(cyl(r1,r0,len,8),mat);m.position.copy(a).addScaledVector(d,0.5);m.quaternion.setFromUnitVectors(new V3(0,1,0),d.normalize());parent.add(m);return m;}
 const VM={};
 (function(){
-  const suit=camoMat(0xd8dcd6),armor=L(0x16181a),metal=L(0x3a3e42),glove=L(0x151719),blk=L(0x1b1d20),poly=L(0x24272a),grey=L(0x30343a),tan=L(0x5a5446),steel=L(0x6a6e70);
+  const suit=camoMat(0x50564a),armor=L(0x16181a),metal=L(0x3a3e42),glove=L(0x151719),blk=L(0x1b1d20),poly=L(0x24272a),grey=L(0x30343a),tan=L(0x5a5446),steel=L(0x6a6e70);
   const red=BASIC(0xff3020,{fog:false}),cyan=BASIC(0x5fd0c8,{fog:false}),lens=BASIC(0xeef4ff,{fog:false});
   const hand=(p,parent,s=1)=>{const h=new THREE.Group();h.position.copy(p);mk(sph(0.034,8,6),glove,0,0,0,h).scale.set(1.05*s,0.85*s,1.45*s);mk(sph(0.016,6,4),glove,0.022,0.012,-0.03,h).scale.set(1,1,2);mk(box(0.04,0.012,0.03),armor,0,0.026,-0.01,h);parent.add(h);return h;};
   const arm=(a,b,parent,wrist)=>{limbBetween(a,b,0.044,0.054,suit,parent);
@@ -1083,15 +1105,15 @@ let kills=0,shake=0,hurtT=0,t=0,missionT=0,stage=0,consoleHold=0,boss=null,secre
 let trail=[],aimT=0,aiming=false,lastAim=new V3(0,0,-1);
 const camTarget=new V3(),aimDir=new V3(0,0,-1);
 const ALLY_DEF=[
-  {name:'CALEB',tint:0xd8dcd2,glow:0xff7a3a},
-  {name:'HANNAH',tint:0xd2d6d8,glow:0xffc04a},
-  {name:'JONAH',tint:0xdcd8d0,glow:0x5fd0c8}
+  {name:'CALEB',tint:0x525a46,glow:0xff7a3a},
+  {name:'HANNAH',tint:0x4c5258,glow:0xffc04a},
+  {name:'JONAH',tint:0x62584a,glow:0x5fd0c8}
 ];
 const OBJ=['Get inside the facility','Restart the yard generator','Search the offices for the shaft key','Reach the shaft past the red door','Call the lift up','The lift is coming'];
 let laser;
 
 function makePlayer(){
-  const o=makeHuman({tint:0xd8dcd6,glow:0xffb040,guns:['pistol','long']});scene.add(o);
+  const o=makeHuman({tint:0x50564a,glow:0xffb040,guns:['pistol','long']});scene.add(o);
   const w=['witness',...armory.filter(a=>WEAP[a])];
   const mags={};w.forEach(k=>mags[k]=WEAP[k].mag);
   return {obj:o,pos:o.position,hp:100,max:100,weapons:w,cur:0,mags,ammo:{p:16,s:armory.includes('jericho')?8:0,r:armory.includes('thunders')?60:0},keys:{},cd:0,reload:0,walk:0,isPlayer:true,yaw:0,pitch:0,kick:0,moveAmt:0,
@@ -1102,7 +1124,7 @@ function makePlayer(){
 function makeAlly(def){
   const o=makeHuman({tint:def.tint,glow:def.glow,guns:['long']});scene.add(o);
   return {obj:o,pos:o.position,name:def.name,hp:100,max:100,cd:rand(0,.5),mag:20,reload:0,downed:false,revive:0,walk:0,
-    hurt(d,src){if(this.downed)return;this.hp-=d;if(this.hp<=0){this.hp=0;this.downed=true;this.revive=0;sfx.down();radio([this.name,'I\u2019m hit! Get me up!'],true);}}};
+    hurt(d,src){if(this.downed)return;this.hp-=d;this.obj.userData.flinch=1;if(this.hp<=0){this.hp=0;this.downed=true;this.revive=0;sfx.down();radio([this.name,'I\u2019m hit! Get me up!'],true);}}};
 }
 const ENEMY={
   wolf:{hp:44,speed:5.0,r:0.5,reach:1.45,dmg:13,rate:0.85,aggro:13,h:1.15},
@@ -1315,7 +1337,7 @@ function updateHud(){
 let bannerT=0;
 function banner(a,b){$('banner').innerHTML=`${a}${b?`<small>${b}</small>`:''}`;$('banner').style.opacity=1;bannerT=3;}
 let radioFull='',radioShown=0,radioT=0;
-function radio([who,line],quick){sfx.radio();$('radioWho').textContent=who+':';radioFull=line;radioShown=0;radioT=quick?3.5:8;}
+function radio([who,line],quick){sfx.radio();{const al=typeof allies!=='undefined'&&allies.find(x=>x.name===who&&!x.dead);if(al)al.obj.userData.talkT=quick?2.5:5;}$('radioWho').textContent=who+':';radioFull=line;radioShown=0;radioT=quick?3.5:8;}
 let toastT=0;function toast(msg){radio(['',msg],true);$('radioWho').textContent='';}
 
 // ================= INPUT =================
@@ -1433,6 +1455,7 @@ function update(dt){
   {const cy=Math.cos(player.yaw),sy=Math.sin(player.yaw);player.pos.x+=(cy*mx+sy*mz)*spd*dt;player.pos.z+=(-sy*mx+cy*mz)*spd*dt;}
   collide(player.pos,0.35);
   player.moveAmt=moving*(aiming?0.5:1);
+  if(moving>0.2){const cy2=Math.cos(player.yaw),sy2=Math.sin(player.yaw),vx=cy2*mx+sy2*mz,vz=-sy2*mx+cy2*mz;const ty=Math.atan2(-vx,-vz);player.moveYaw=(player.moveYaw===undefined?ty:player.moveYaw+Math.atan2(Math.sin(ty-player.moveYaw),Math.cos(ty-player.moveYaw))*Math.min(1,dt*3));}
   player.obj.rotation.y=player.yaw+Math.PI;
   const lt=trail[trail.length-1];if(!lt||Math.hypot(lt.x-player.pos.x,lt.z-player.pos.z)>0.7){trail.push({x:player.pos.x,z:player.pos.z});if(trail.length>90)trail.shift();}
 
@@ -1469,6 +1492,8 @@ function update(dt){
   }
 
   // ---- allies
+  const combatNear=enemies.some(e=>e.alive&&e.aggro&&e.pos.distanceTo(player.pos)<18);
+  player.stillT=player.moveAmt<0.08?(player.stillT||0)+dt:0;
   for(let i=0;i<allies.length;i++){const a=allies[i],u=a.obj.userData;
     if(a.flashT>0){a.flashT-=dt;if(a.flashT<=0)flashOf(a.obj).visible=false;}
     if(a.reload>0)a.reload-=dt;
@@ -1481,19 +1506,34 @@ function update(dt){
       continue;
     }
     u.rig.rotation.x*=Math.max(0,1-8*dt);u.rig.position.y*=Math.max(0,1-8*dt);
-    const idx=trail.length-1-(i+1)*3;const tp=idx>=0?trail[idx]:{x:player.pos.x,z:player.pos.z+1.5};
+    const idx=trail.length-1-(i+1)*3;let tp=idx>=0?trail[idx]:{x:player.pos.x,z:player.pos.z+1.5};
+    const pcy=Math.cos(player.moveYaw||0),psy=Math.sin(player.moveYaw||0);
+    const SLOT=[[-1.7,1.1],[1.7,1.1],[0.4,2.5]][i]||[0,2];
+    const SECT=[[-pcy,psy],[pcy,-psy],[psy,pcy]][i]||[psy,pcy];
+    const settle=player.stillT>0.9&&!combatNear;
+    if(settle){for(const k of[1,0.55]){const sx=player.pos.x+(pcy*SLOT[0]+psy*SLOT[1])*k,sz=player.pos.z+(-psy*SLOT[0]+pcy*SLOT[1])*k;const [stx,sty]=tileAt(sx,sz);if(walkable(stx,sty)&&los(player.pos.x,player.pos.z,sx,sz)){tp={x:sx,z:sz};break;}}}
     let dx=tp.x-a.pos.x,dz=tp.z-a.pos.z,d=Math.hypot(dx,dz),mv=0;
     if(d>0.5){const sp=Math.min(6.2,d*3.2);a.pos.x+=dx/d*sp*dt;a.pos.z+=dz/d*sp*dt;mv=Math.min(1,sp/5.5);}
     if(Math.hypot(a.pos.x-player.pos.x,a.pos.z-player.pos.z)>18){a.pos.set(tp.x,0,tp.z);}
-    for(const b of [player,...allies]){if(b===a)continue;const ex=a.pos.x-b.pos.x,ez=a.pos.z-b.pos.z,ed=Math.hypot(ex,ez);if(ed<0.8&&ed>0){a.pos.x+=ex/ed*(0.8-ed)*0.5;a.pos.z+=ez/ed*(0.8-ed)*0.5;}}
+    for(const b of [player,...allies]){if(b===a)continue;const R=b===player?1.25:0.8,ex=a.pos.x-b.pos.x,ez=a.pos.z-b.pos.z,ed=Math.hypot(ex,ez);if(ed<R&&ed>0){const k=b===player?0.25:0.5;a.pos.x+=ex/ed*(R-ed)*k;a.pos.z+=ez/ed*(R-ed)*k;}}
     collide(a.pos,0.4);
     a.cd-=dt;let tgt=null,bd=16*16;
     for(const e of enemies){if(!e.alive||!e.aggro||e.pos.y<-1)continue;const q=(e.pos.x-a.pos.x)**2+(e.pos.z-a.pos.z)**2;if(q<bd&&los(a.pos.x,a.pos.z,e.pos.x,e.pos.z)){bd=q;tgt=e;}}
     if(tgt){const ex=tgt.pos.x-a.pos.x,ez=tgt.pos.z-a.pos.z;face(a.obj,ex,ez,dt,10);
       if(a.cd<=0&&a.reload<=0&&u.aimB>0.7){a.cd=rand(0.6,0.95);fire(a.pos,tmpV.set(ex,0,ez).normalize(),{pellets:1,spread:0.13,dmg:5,life:0.45},bulletMatA,'a');sfx.ally();flashOf(a.obj).visible=true;a.flashT=0.05;u.recoil=1;
         if(--a.mag<=0){a.mag=20;a.reload=2.2;sfx.reload();}}}
-    else if(mv>0.1)face(a.obj,dx,dz,dt,8);
-    animHuman(a.obj,dt,mv,tgt?1:0,a.reload>0?1-a.reload/2.2:-1);
+    else if(mv>0.1)face(a.obj,dx,dz,dt,6);
+    else if(settle)face(a.obj,SECT[0],SECT[1],dt,2.5);
+    // where to look: enemy > whoever's talking or the player looking at me > scan my sector
+    {const tpx=player.pos.x-a.pos.x,tpz=player.pos.z-a.pos.z,pd=Math.hypot(tpx,tpz);
+     const toMe=pd>0.1?Math.acos(clamp(-(aimDir.x*tpx+aimDir.z*tpz)/pd,-1,1)):3;
+     const rel=Math.atan2(Math.sin(Math.atan2(tpx,tpz)-a.obj.rotation.y),Math.cos(Math.atan2(tpx,tpz)-a.obj.rotation.y));
+     if(tgt){u.headYawT=0;u.headPitchT=0;}
+     else if(u.talkT>0||(pd<6&&toMe<0.22&&!combatNear)){u.headYawT=rel;u.headPitchT=-0.05;if(pd<6&&toMe<0.22&&!(a.seen>0)){a.seen=6;u.talkT=0.6;}}
+     else if(mv>0.1){u.headYawT=Math.sin(t*0.35+i*2.1)*0.45;u.headPitchT=0;}
+     else{u.headYawT=Math.sin(t*0.42+i*2.3)*0.75+Math.sin(t*1.1+i)*0.12;u.headPitchT=Math.sin(t*0.3+i)*0.06;}
+     a.seen=Math.max(0,(a.seen||0)-dt);}
+    animHuman(a.obj,dt,mv,tgt?1:(settle&&mv<0.1?0.32:0),a.reload>0?1-a.reload/2.2:-1);
   }
 
   // ---- flow field
