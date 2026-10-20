@@ -263,7 +263,16 @@ body.noCursor #c{cursor:none}
     <div class="colStats" id="colStats"></div>
     <div class="lbl">LOGS</div>
     <div class="colList" id="colList"></div>
-    <button class="ghost" id="colBack">BACK</button>
+    <div class="row"><button class="ghost" id="colRemember">REMEMBER</button><button class="ghost" id="colBack">BACK</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="remember" hidden>
+  <div class="panel">
+    <div class="eyebrow">WHAT WAS WITNESSED</div>
+    <h2>Remember</h2>
+    <div class="missions" id="remList"></div>
+    <button class="ghost" id="remBack">BACK</button>
   </div>
 </div>
 
@@ -1976,7 +1985,7 @@ function clearWorld(){
   enemies=[];bullets=[];orbs=[];pickups=[];parts=[];notes=[];allies=[];
 }
 let consoleObj=null,consoleScr=null,genObj=null,genHold=0,saidQuiet=false,events=[],liftStarted=false,saidWolf=false,saidScorp=false;
-function startMission(){
+function startMission(replay){
   initAudio();if(AC&&AC.state==='suspended')AC.resume();
   clearWorld();buildGrid();buildLevel();
   player=makePlayer();
@@ -2003,6 +2012,9 @@ function startMission(){
   setObjective(0);eyeOpen=0;skyBlot=0;
   $('hud').hidden=true;
   player.home=player.pos.clone();
+  // replaying a remembered scene: build the site, play the scene, then go back to the Remember list
+  if(replay&&replay.cine){enemies.forEach(e=>scene.remove(e.obj));enemies=[];playCine(replay.cine(),exitReplay);if(replay.id==='ending'){player.obj.visible=false;allies.forEach(a=>a.obj.visible=false);}return;}
+  markSeen('opening');
   playCine(OPENING,()=>{STAGE.yard();skyBlot=Math.max(skyBlot,0.32);heli.visible=true;heli.position.set(57,0.2,111);heli.rotation.set(0,Math.PI+0.3,0);state='play';player.obj.visible=false;player.yaw=0;player.pitch=0;$('hud').hidden=false;events.push({t:3,fn:()=>{heliState='depart';}});});
 }
 function pitSpawn(type){const a=rand(0,TAU),r=rand(0.4,1.6);const x=50+Math.cos(a)*r,z=10+Math.sin(a)*r;const w=spawnEnemy(type,x,z);w.pos.y=-1.6;w.aggro=true;w.home={x,z};w.mode='lunge';w.modeT=1.4;w.obj.rotation.y=rand(0,TAU);}
@@ -2619,7 +2631,7 @@ function gameOver(){
   setTimeout(()=>{if(state!=='over')return;$('hud').hidden=true;$('over').hidden=false;},1800);
 }
 function missionComplete(){
-  state='win';laser.visible=false;seenEye=true;try{localStorage.setItem('tribulation.eye','1');}catch(e){}eyeOpen=1;skyBlot=1;
+  state='win';laser.visible=false;seenEye=true;markSeen('ending');try{localStorage.setItem('tribulation.eye','1');}catch(e){}eyeOpen=1;skyBlot=1;
   const m=Math.floor(missionT/60),s=Math.floor(missionT%60);
   $('wTime').textContent=`${m}:${String(s).padStart(2,'0')}`;$('wKills').textContent=kills;
   const found=['jericho','thunders'].filter(id=>armory.includes(id)).length;
@@ -2653,6 +2665,20 @@ function renderCollection(){
   $('colList').innerHTML=NOTES.map((N,i)=>notesFound.includes(i)?`<details><summary>${N.t}</summary><p>${N.b}<cite>\u2014 ${N.c}</cite></p></details>`:`<div class="lock">\u2014 NOT RECOVERED \u2014</div>`).join('');}
 $('toLoadout').onclick=()=>{$('title').hidden=true;$('loadout').hidden=false;};
 $('loBack').onclick=()=>{$('loadout').hidden=true;$('title').hidden=false;};
+// ---- Remember: rewatch scenes already seen
+const MEMORIES=[
+  {id:'opening',num:'I',t:'STANDING ORDER',s:'Vale sends the Horsemen to Site 9',cine:()=>OPENING},
+  {id:'ending',num:'II',t:'THE FIRST TRUMPET',s:'Hail and fire, and the eye above the ridge',cine:()=>ENDING}
+];
+let seenCines={};try{seenCines=JSON.parse(localStorage.getItem('tribulation.cines')||'{}');}catch(e){}
+if(seenEye){seenCines.opening=1;seenCines.ending=1;}
+function markSeen(id){seenCines[id]=1;try{localStorage.setItem('tribulation.cines',JSON.stringify(seenCines));}catch(e){}}
+function renderRemember(){
+  $('remList').innerHTML=MEMORIES.map((m,i)=>seenCines[m.id]?`<button class="mission" data-i="${i}"><span class="num">${m.num}</span><span class="t">${m.t}</span><span class="s">${m.s}</span></button>`:`<button class="mission" disabled><span class="num">${m.num}</span><span class="t">\u2014 NOT YET WITNESSED \u2014</span><span class="s">Locked</span></button>`).join('');
+  $('remList').querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{$('remember').hidden=true;startMission(MEMORIES[+b.dataset.i]);});}
+function exitReplay(){showMissions();$('missions').hidden=true;renderRemember();$('remember').hidden=false;}
+$('colRemember').onclick=()=>{renderRemember();$('collection').hidden=true;$('remember').hidden=false;};
+$('remBack').onclick=()=>{$('remember').hidden=true;renderCollection();$('collection').hidden=false;};
 $('toCollection').onclick=()=>{renderCollection();$('title').hidden=true;$('collection').hidden=false;};
 $('colBack').onclick=()=>{$('collection').hidden=true;$('title').hidden=false;};
 $('toSettings').onclick=()=>{$('title').hidden=true;$('settings').hidden=false;$('setMsg').textContent='';$('resetBtn').classList.remove('armed');$('resetBtn').textContent='RESET ALL DATA';};
