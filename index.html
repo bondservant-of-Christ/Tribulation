@@ -215,10 +215,12 @@ body.noCursor #c{cursor:none}
     <h2>Missions</h2>
     <div class="missions">
       <button class="mission" id="m1"><span class="num">I</span><span class="t">SITE 9</span><span class="s">Kessel Mine · anomalous failures</span></button>
-      <button class="mission" disabled><span class="num">II</span><span class="t">WORMWOOD</span><span class="s">Locked</span></button>
-      <button class="mission" disabled><span class="num">III</span><span class="t">THE WELL</span><span class="s">Locked</span></button>
-      <button class="mission" disabled><span class="num">IV</span><span class="t">THE RIVER LINE</span><span class="s">Locked</span></button>
-      <button class="mission" disabled><span class="num">V</span><span class="t">THE SEVENTH</span><span class="s">Locked</span></button>
+      <button class="mission" disabled><span class="num">II</span><span class="t">MOUNTAIN &amp; BLOOD</span><span class="s">Locked</span></button>
+      <button class="mission" disabled><span class="num">III</span><span class="t">WORMWOOD</span><span class="s">Locked</span></button>
+      <button class="mission" disabled><span class="num">IV</span><span class="t">DARKNESS</span><span class="s">Locked</span></button>
+      <button class="mission" disabled><span class="num">V</span><span class="t">THE PIT</span><span class="s">Locked</span></button>
+      <button class="mission" disabled><span class="num">VI</span><span class="t">THE RIVER</span><span class="s">Locked</span></button>
+      <button class="mission" disabled><span class="num">VII</span><span class="t">THE TEMPLE</span><span class="s">Locked</span></button>
     </div>
     <div class="lbl">ARMORY · HIDDEN WEAPONS FOUND</div>
     <div class="armory" id="armory"></div>
@@ -266,7 +268,7 @@ body.noCursor #c{cursor:none}
   <div class="panel">
     <div class="eyebrow">MISSION I COMPLETE</div>
     <h2>Something <em>Opened</em></h2>
-    <blockquote>The crew is still missing. Vale has pulled every unit off the ridge. By morning, the wells in the valley taste bitter.</blockquote>
+    <blockquote>The crew is still missing. The ridge burned until morning. Command is pulling the Horsemen out by sea.</blockquote>
     <div class="tally">
       <div><span class="lbl">TIME</span><b id="wTime">0:00</b></div>
       <div><span class="lbl">SLAIN</span><b id="wKills">0</b></div>
@@ -516,8 +518,40 @@ function buildSets(){
   beam.visible=false;hb.add(beam);
   heli.userData={rotor,trot,nav,beam};heli.visible=false;scene.add(heli);
 }
+let hail=null,ridgeFire=null,hailOn=false,fireOn=0,hailHiss=0;
+function buildWeather(){
+  const N=520,pos=new Float32Array(N*6);hail={N,pos,v:new Float32Array(N)};
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  hail.m=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0xe8b4aa,transparent:true,opacity:0.55,fog:false,depthWrite:false}));
+  hail.m.frustumCulled=false;hail.m.visible=false;scene.add(hail.m);
+  for(let i=0;i<N;i++){hail.v[i]=rand(18,26);pos[i*6+1]=-99;}
+  // a low ridge north of the yard, and the line of fire that runs along it
+  const ridge=new THREE.Group();scene.add(ridge);const rM=new THREE.MeshPhongMaterial({color:0x0c0c0d,flatShading:true});
+  const fp=[];
+  for(let i=0;i<14;i++){const x=-20+i*11+rand(-3,3),h=rand(14,24),r=rand(9,14),z=-62+rand(-4,4);
+    const c=new THREE.Mesh(new THREE.ConeGeometry(r,h,5),rM);c.position.set(x,h/2-1,z);ridge.add(c);
+    for(let j=0;j<16;j++){const k=rand(0.35,0.95),ang=rand(-0.9,0.9);fp.push(x+Math.sin(ang)*r*(1-k)*0.9,h*k-1+rand(0,0.6),z+Math.cos(ang)*r*(1-k)*0.9+1);}}
+  const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(fp),3));
+  const col=new Float32Array(fp.length);fg.setAttribute('color',new THREE.BufferAttribute(col,3));
+  ridgeFire=new THREE.Points(fg,new THREE.PointsMaterial({size:2.6,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  ridgeFire.userData.base=fp.slice();ridgeFire.userData.reach=fp.map((_,i)=>i%3===0?(fp[i]+20)/154:0);ridgeFire.visible=false;scene.add(ridgeFire);
+}
+function updateWeather(dt){
+  if(hail){hail.m.visible=hailOn;
+    if(hailOn){const p=hail.pos,c=camera.position;
+      for(let i=0;i<hail.N;i++){const o=i*6;
+        if(p[o+1]<0||Math.abs(p[o]-c.x)>14||Math.abs(p[o+2]-c.z)>14){p[o]=c.x+rand(-14,14);p[o+1]=c.y+rand(2,16);p[o+2]=c.z+rand(-14,14);}
+        p[o]+=dt*2.2;p[o+1]-=hail.v[i]*dt;p[o+3]=p[o]-0.07;p[o+4]=p[o+1]+0.55;p[o+5]=p[o+2];}
+      hail.m.geometry.attributes.position.needsUpdate=true;
+      hailHiss-=dt;if(hailHiss<=0){hailHiss=0.06;noise(0.07,rand(2500,5200),0.7,0.035);if(Math.random()<0.25)noise(0.03,rand(900,1500),3,0.05);}}}
+  if(ridgeFire){ridgeFire.visible=fireOn>0;
+    if(fireOn>0){const col=ridgeFire.geometry.attributes.color.array,pp=ridgeFire.geometry.attributes.position.array,b=ridgeFire.userData.base,r=ridgeFire.userData.reach;
+      for(let i=0;i<col.length;i+=3){const lit=fireOn>r[i]?1:0,f=lit*(0.55+0.45*Math.random());col[i]=f;col[i+1]=f*rand(0.25,0.5);col[i+2]=f*0.08;pp[i+1]=b[i+1]+lit*Math.random()*0.5;}
+      ridgeFire.geometry.attributes.color.needsUpdate=true;ridgeFire.geometry.attributes.position.needsUpdate=true;}}
+}
 let heliThump=0;
 function updateSets(dt){
+  updateWeather(dt);
   if(heli&&heli.visible){heli.userData.rotor.rotation.y+=dt*24;heli.userData.trot.rotation.x+=dt*30;heli.userData.nav.visible=(t%1)<0.15;
     const dd=camera.position.distanceTo(heli.position);heliThump-=dt;if(heliThump<=0){heliThump=0.105;const v=clamp(1-dd/140,0,1);if(v>0.02){noise(0.08,85,0.7,0.32*v);noise(0.05,240,1.5,0.06*v);}}
     setLights[2].position.set(heli.position.x,heli.position.y-2,heli.position.z+2);setLights[2].intensity=heli.position.y<40&&state!=='title'?1.5:0;
@@ -1574,9 +1608,9 @@ let kills=0,shake=0,hurtT=0,t=0,missionT=0,stage=0,consoleHold=0,boss=null,secre
 let trail=[],aimT=0,aiming=false,lastAim=new V3(0,0,-1);
 const camTarget=new V3(),aimDir=new V3(0,0,-1);
 const ALLY_DEF=[
-  {name:'CALEB',armor:0x2e3032,armor2:0x161718,glow:0xd8302a,suit:0x1f2123},
-  {name:'HANNAH',armor:0x1e1f21,armor2:0x101112,glow:0xe0342c,body:'f',suit:0x18191b},
-  {name:'JONAH',armor:0x3a3c3f,armor2:0x1b1c1e,glow:0xc8281f,suit:0x232528}
+  {name:'NIKON',call:'Nikon',armor:0x2e3032,armor2:0x161718,glow:0xd8302a,suit:0x1f2123},
+  {name:'SCAR',call:'Scar',armor:0x1e1f21,armor2:0x101112,glow:0xe0342c,body:'f',suit:0x18191b},
+  {name:'POLEMOS',call:'Polemos',armor:0x3a3c3f,armor2:0x1b1c1e,glow:0xc8281f,suit:0x232528}
 ];
 const OBJ=['Get inside the facility','Restart the yard generator','Search the offices for the shaft key','Reach the shaft past the red door','Call the lift up','The lift is coming'];
 let laser;
@@ -1592,8 +1626,8 @@ function makePlayer(){
 }
 function makeAlly(def){
   const o=makeHuman({armor:def.armor,armor2:def.armor2,glow:def.glow,body:def.body,suit:def.suit,guns:['long']});scene.add(o);
-  return {obj:o,pos:o.position,name:def.name,hp:100,max:100,cd:rand(0,.5),mag:20,reload:0,downed:false,revive:0,walk:0,
-    hurt(d,src){if(this.downed)return;this.hp-=d;this.obj.userData.flinch=1;if(this.hp<=0){this.hp=0;this.downed=true;this.revive=0;sfx.down();radio([this.name,'I\u2019m hit! Get me up!'],true);}}};
+  return {obj:o,pos:o.position,name:def.name,call:def.call,fem:def.body==='f',bleed:0,ffKnock:false,hp:100,max:100,cd:rand(0,.5),mag:20,reload:0,downed:false,revive:0,walk:0,
+    hurt(d,src){if(this.downed)return;this.hp-=d;this.obj.userData.flinch=1;if(this.hp<=0){this.hp=0;this.downed=true;this.revive=0;this.bleed=BLEED;this.ffKnock=false;sfx.down();radio([this.name,'I\u2019m hit! Get me up!'],true);}}};
 }
 const ENEMY={
   wolf:{hp:44,speed:5.0,r:0.52,reach:1.45,dmg:13,rate:0.85,aggro:13,h:1.25},
@@ -1660,7 +1694,7 @@ function startMission(){
     else addPickup(c,wx,wz);
   });
   laser=new THREE.Mesh(box(0.025,0.025,1),BASIC(0xff2a1a,{transparent:true,opacity:.7}));laser.visible=false;scene.add(laser);
-  kills=0;shake=0;missionT=0;deathT=0;wrath=0;ffKills=0;bloodT=0;bloodAmp=0;stage=0;consoleHold=0;genHold=0;saidQuiet=false;events=[];liftStarted=false;saidWolf=false;saidScorp=false;tracers.forEach(r=>scene.remove(r.m));tracers=[];vmS.cur=null;vmS.aimB=0;boss=null;secretsFound=[];winT=0;trail=[];aimT=0;aiming=false;
+  kills=0;shake=0;missionT=0;deathT=0;hailOn=false;fireOn=0;wrath=0;ffKills=0;bloodT=0;bloodAmp=0;stage=0;consoleHold=0;genHold=0;saidQuiet=false;events=[];liftStarted=false;saidWolf=false;saidScorp=false;tracers.forEach(r=>scene.remove(r.m));tracers=[];vmS.cur=null;vmS.aimB=0;boss=null;secretsFound=[];winT=0;trail=[];aimT=0;aiming=false;
   camTarget.copy(player.pos);
   buildSquadHud();hudCache={};
   ['title','missions','over','win','pause'].forEach(id=>$(id).hidden=true);$('hud').hidden=false;
@@ -1685,19 +1719,23 @@ const OPENING=[
   {d:8,who:'CMDR. VALE',text:'The surface crew’s last call was about the sky. We’ve been listening to it ever since.',cam:k=>cAt(L3(RP(1.0,2.5,-2.3),RP(1.45,2.5,-2.9),k),RP(1.62,2.47,-3.8))},
   {d:7,who:'CMDR. VALE',text:'You go in. You find the crew. You find out what is wrong with that drill.',cam:k=>{vale.rotation.y=lerp(Math.PI,0,ss(k*1.4));vale.userData.talkT=1.5;cAt(RP(0.6,1.25,-3.3),RP(0,1.6,0.5));}},
   {d:8,who:'CMDR. VALE',text:'You cannot mess this up. There is no room for mistakes, do you understand?',cam:k=>{vale.rotation.y=0;vale.userData.talkT=1.5;cAt(L3(RP(0.34,1.56,-1.3),RP(0.22,1.54,-1.55),ss(k)),RP(0,1.56,-2.3));}},
-  {d:4,who:'CALEB',text:'Understood, Commander.',cam:k=>cAt(RP(0.2,1.65,-1.8),RP(-0.3,1.6,1.9))},
+  {d:7,who:'CMDR. VALE',text:'Nikon, you have the lead. Scar, Polemos, on him. Necros… you have the rear. Nobody gets left down there.',cam:k=>{vale.rotation.y=0;vale.userData.talkT=1.5;cAt(L3(RP(-1.6,1.7,1.2),RP(-1.3,1.7,0.9),k),RP(0,1.62,-2.3));}},
+  {d:4,who:'NIKON',text:'Understood, Commander.',cam:k=>cAt(RP(0.2,1.65,-1.8),RP(-0.3,1.6,1.9))},
   {d:9,card:{t:'HORSEMEN PROTOCOL · STANDING ORDER 0',b:'Everything you do past this point is permanent. There is no reload, no second chance, and no one coming to undo it.',c:'LOGGED · NORDKAPP COMMAND'},cam:k=>cAt(RP(0,2.0,-1.5),RP(0,2.0,-3.8))},
   {d:7,text:'NORDLAND · 03:47',on:()=>{STAGE.sky();},cam:k=>{heli.position.set(lerp(84,64,k),lerp(42,32,k),lerp(200,150,k));heli.rotation.set(0.06,Math.PI+0.38,0.1);const h=heli.position;camAt(h.x-8,h.y-0.5,h.z-15,h.x,h.y+1.2,h.z);}},
   {d:8,who:'PILOT',text:'Two minutes out. Floodlights are still burning down there… nobody’s answering the hail.',cam:k=>{heli.position.set(lerp(62,57,k),lerp(30,16,k),lerp(150,128,k));heli.rotation.set(0.08,Math.PI+0.2,0);const h=heli.position;camAt(h.x+5,h.y+4.5,h.z+13,lerp(h.x,52,0.5),lerp(h.y,2,0.6),h.z-40);}},
-  {d:7,who:'CALEB',text:'Ground’s clear. Gate’s dark. Stay on me.',on:()=>STAGE.yard(),cam:k=>{const e=ss(k);heli.position.set(57,lerp(14,0.2,Math.min(1,e*1.4)),lerp(130,111,Math.min(1,e*1.3)));heli.rotation.set(0,Math.PI+0.3,0);camAt(51,1.7,103,heli.position.x,heli.position.y+1.5,heli.position.z);}},
-  {d:7,who:'HANNAH',text:'…Is it just me, or are there fewer stars than there should be?',on:()=>sfx.howl(),cam:k=>{skyBlot=ss(k)*0.32;SKYCAM(k,4);}},
+  {d:7,who:'NIKON',text:'Ground’s clear. Gate’s dark. Stay on me.',on:()=>STAGE.yard(),cam:k=>{const e=ss(k);heli.position.set(57,lerp(14,0.2,Math.min(1,e*1.4)),lerp(130,111,Math.min(1,e*1.3)));heli.rotation.set(0,Math.PI+0.3,0);camAt(51,1.7,103,heli.position.x,heli.position.y+1.5,heli.position.z);}},
+  {d:7,who:'SCAR',text:'…Is it just me, or are there fewer stars than there should be?',on:()=>sfx.howl(),cam:k=>{skyBlot=ss(k)*0.32;SKYCAM(k,4);}},
   {d:4,text:'',cam:k=>{const p=player.pos,e=ss(k);player.obj.visible=e<0.75;camAt(p.x,lerp(2.2,1.6,e),p.z+lerp(6,0,e),p.x,lerp(51,1.6,e),p.z+lerp(-160,-10,e));}}
 ];
 const ENDING=[
   {d:5,text:'The lift comes up empty. The cage door is bent outward.',cam:k=>{const c=levelGroup.userData.cage;c.position.y=lerp(-8,0,ss(k*1.3));camAt(50,7,23,50,0.5,10);},on:()=>{sfx.door();sfx.rumble();}},
   {d:7,text:'Over the ridge, the stars go out. Not behind cloud. Gone.',cam:k=>{skyBlot=lerp(0.32,1,ss(k));camAt(50+Math.sin(k)*1.5,4.5,100-k*3,50,26,-30);}},
   {d:6,text:'',cam:k=>{eyeOpen=ss((k-0.15)/0.8);const sh=(1-k)*0.25*(k>0.15?1:0);camAt(51.5+rand(-sh,sh),4.5+rand(-sh,sh),97+rand(-sh,sh),50,26,-30);},on:()=>sfx.rumble()},
-  {d:6,text:'Something above Site 9 has opened its eye.',cam:k=>{eyeOpen=1;camAt(51.5,4.5+k*0.4,97-k*4,50,26+k*2,-30);}}
+  {d:6,text:'Something above Site 9 has opened its eye.',cam:k=>{eyeOpen=1;camAt(51.5,4.5+k*0.4,97-k*4,50,26+k*2,-30);}},
+  {d:6,who:'SCAR',text:'…That’s not ice.',on:()=>{hailOn=true;},cam:k=>{eyeOpen=1;camAt(51,2.6+k*0.6,90,50,lerp(14,22,k),-30);}},
+  {d:8,text:'Along the ridge the treeline catches, one tree after the next, like a fuse.',on:()=>{fireOn=0.001;sfx.rumble();},cam:k=>{eyeOpen=1;fireOn=Math.max(0.001,ss(k*1.15));camAt(50+k*2,5.5,34,50,13,-60);}},
+  {d:8,who:'CMDR. VALE',text:'Horsemen, the road is gone. Get to the coast. Site 9 has a sea intake on the fjord. We will pull you out there.',on:()=>sfx.radio(),cam:k=>{eyeOpen=1;fireOn=1;camAt(49,3+k,40+k*4,50,11,-60);}}
 ];
 function playCine(shots,onEnd){
   cine={shots,i:-1,t:0,onEnd,full:'',shown:0};state='cine';hemi.intensity=0.45;scene.fog.near=20;scene.fog.far=60;camera.fov=50;camera.updateProjectionMatrix();if(player){player.obj.visible=true;player.obj.rotation.y=player.yaw+Math.PI;}
@@ -1782,15 +1820,28 @@ function hitscan(muzzleP,fwd,spread,range,dmg,breaker){
   else if(kind!=='none')spark3(end);
   _tv.copy(muzzleP).addScaledVector(_hd,0.3);tracer(_tv,end);
 }
+const BLEED=10;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function inCombat(){return enemies.some(e=>e.alive&&e.aggro&&e.pos.distanceTo(player.pos)<20);}
 const FF_LINES={hit:['Check your fire!','That was me! Watch it!','You hit me! I’m on your side!']};
 function shootAlly(a,head){
   if(a.dead)return;
+  if(inCombat()){
+    // a stray round in a firefight: they go down, not out
+    a.obj.userData.flinch=1;
+    if(a.downed){a.bleed=Math.max(0.5,a.bleed-3);return;}
+    a.hp=0;a.downed=true;a.revive=0;a.bleed=BLEED;a.ffKnock=true;sfx.down();shake=Math.max(shake,0.6);
+    const n=a.call,him=a.fem?'her':'him',he=a.fem?'She':'He';
+    radio([a.name,pick(['Agh— I’m hit, I’m hit… that was you…','Friendly— I’m down. I’m down.','Ngh— you clipped me. Get me up…'])],true);
+    allies.filter(o=>o!==a&&!o.dead&&!o.downed).forEach((o,i)=>events.push({t:1.6+i*2,fn:()=>{if(!o.dead&&!o.downed)radio([o.name,pick([`${n}’s down— hold your fire, hold your fire.`,`Easy… ${he}’s breathing. Get ${him} up, now.`,`Watch your lane. Get to ${him}, quick.`])],true);}}));
+    return;
+  }
   if(head||a.downed){
-    const deliberate=head&&!enemies.some(e=>e.alive&&e.aggro&&e.pos.distanceTo(player.pos)<20);
+    const deliberate=head;
     a.dead=true;a.downed=true;a.hp=0;a.revive=0;sfx.down();
     ffKills++;shake=Math.max(shake,2.2);sfx.rumble();bloodAmp=Math.min(1,0.35+ffKills*0.25);bloodT=1;
     const live=allies.filter(o=>!o.dead);
-    const n=a.name,him=n==='HANNAH'?'her':'him',he=n==='HANNAH'?'She':'He';
+    const n=a.call,him=a.fem?'her':'him',he=a.fem?'She':'He';
     const lines=deliberate?[
       [`WHAT DID YOU DO?! There was nothing there!`,`You shot ${n}. In the head. On purpose.`,`Get away from me. GET AWAY FROM ME!`],
       [`${n}?! ${n}! …${he}’s gone. You killed ${him}.`,`Don’t point that thing at me. Don’t you dare.`,`Something’s wrong with you. Something got into you down here.`]
@@ -1800,7 +1851,7 @@ function shootAlly(a,head){
     ];
     live.forEach((o,i)=>{const set=lines[i%2];o.obj.userData.flinch=1;o.fearT=deliberate?7:3;
       events.push({t:0.25+i*2.2,fn:()=>{if(!o.dead)radio([o.name,set[Math.floor(Math.random()*set.length)]],i>0);}});});
-    if(!live.length)toast(n+' IS DEAD');
+    if(!live.length)toast(a.name+' IS DEAD');
     if(deliberate){
       wrath++;
       enemies.forEach(e=>{if(!e.alive)return;e.hp*=1.35;e.max*=1.35;e.dmg*=1.3;e.speed*=1.1;});
@@ -1823,11 +1874,12 @@ function updateHud(){
   const wk=player.weapons[player.cur],w=WEAP[wk];
   setText('wName',w.name);setText('mag',String(player.mags[wk]));setText('res',String(player.ammo[w.ammo]));
   setText('reloadTxt',player.reload>0?'RELOADING':(player.mags[wk]===0&&player.ammo[w.ammo]===0?'EMPTY':''));
-  allies.forEach((a,i)=>{const row=$('sq'+i);if(!row)return;row.classList.toggle('down',a.downed);row.classList.toggle('kia',!!a.dead);row.querySelector('i').style.width=(a.downed?0:a.hp)+'%';});
+  allies.forEach((a,i)=>{const row=$('sq'+i);if(!row)return;row.classList.toggle('down',a.downed);row.classList.toggle('kia',!!a.dead);row.querySelector('i').style.width=(a.dead?0:a.downed?Math.max(0,a.bleed/BLEED*100):a.hp)+'%';});
   const kk=(player.keys.k?'k':'')+(player.keys.b?'b':'');
   if(hudCache.keys!==kk){hudCache.keys=kk;$('keys').innerHTML=(player.keys.k?'<span style="background:var(--blood)"></span>':'')+(player.keys.b?'<span style="background:#3a6aff"></span>':'');}
   let hold='';const rev=allies.find(a=>a.downed&&!a.dead&&a.revive>0);
   if(rev)hold=`LIFTING ${rev.name} ${'\u2588'.repeat(Math.ceil(rev.revive/2.4*8))}`;
+  else if(allies.some(a=>a.downed&&!a.dead)){const a=allies.find(a=>a.downed&&!a.dead);hold=`${a.name} DOWN · ${Math.max(0,Math.ceil(a.bleed))}`;}
   else if(stage===4&&consoleHold>0)hold=`CALLING LIFT ${'\u2588'.repeat(Math.ceil(consoleHold/10*10))}`;
   else if(stage<=1&&genHold>0)hold=`RESTARTING ${'\u2588'.repeat(Math.ceil(genHold/2.5*10))}`;
   setText('holdTxt',hold);
@@ -1977,10 +2029,10 @@ function update(dt){
     let want=false;
     const pn=near(player);
     if(d.type==='G'&&!d.unlocked&&pn){
-      if(d.warned<=0){d.warned=6;sfx.denied();if(stage===0){setObjective(1);radio(['HANNAH','Gate\u2019s dead. No power to the doors. There\u2019s a generator shed east of the yard.']);}else toast('NO POWER TO THE DOORS');}
+      if(d.warned<=0){d.warned=6;sfx.denied();if(stage===0){setObjective(1);radio(['SCAR','Gate\u2019s dead. No power to the doors. There\u2019s a generator shed east of the yard.']);}else toast('NO POWER TO THE DOORS');}
     }
     else if(d.type!=='D'&&!d.unlocked&&pn){
-      if(player.keys[d.type==='R'?'k':'b']){d.unlocked=true;sfx.door();if(d.type==='R'){radio(['CALEB','Key took. Shaft door\u2019s open. Why is the air warm?'],true);}else{toast('BLUE LOCK RELEASED');}}
+      if(player.keys[d.type==='R'?'k':'b']){d.unlocked=true;sfx.door();if(d.type==='R'){radio(['NIKON','Key took. Shaft door\u2019s open. Why is the air warm?'],true);}else{toast('BLUE LOCK RELEASED');}}
       else if(d.warned<=0){d.warned=4;sfx.denied();toast(d.type==='R'?'LOCKED \u00b7 SHAFT KEY REQUIRED':'LOCKED \u00b7 BLUE KEYCARD REQUIRED');}
     }
     d.warned-=dt;
@@ -2000,8 +2052,15 @@ function update(dt){
     if(a.downed){
       u.rig.rotation.x+=(-Math.PI/2-u.rig.rotation.x)*Math.min(1,8*dt);u.rig.position.y=0.22;
       const d=Math.hypot(a.pos.x-player.pos.x,a.pos.z-player.pos.z);
-      if(d<2.2&&player.hp>0)a.revive+=dt;else a.revive=Math.max(0,a.revive-dt*0.5);
-      if(a.revive>=2.4){a.downed=false;a.hp=50;a.revive=0;radio([a.name,'On my feet. Thank you.'],true);}
+      if(d<2.2&&player.hp>0)a.revive+=dt;else{a.revive=Math.max(0,a.revive-dt*0.5);a.bleed-=dt;}
+      if(a.revive>=2.4){a.downed=false;a.hp=50;a.revive=0;
+        if(a.ffKnock){a.ffKnock=false;radio([a.name,pick(['I’m okay. I’m okay… just watch your line.','Still here. Don’t do that again.','…Okay. Okay. I’m good. Keep moving.'])],true);
+          const o=allies.find(x=>x!==a&&!x.dead&&!x.downed);if(o)events.push({t:2.2,fn:()=>{if(!o.dead)radio([o.name,pick([`Thank God. Thought we lost you, ${a.call}.`,'Breathe. Everyone breathe.',`${a.call}’s up. We’re fine. We’re fine.`])],true);}});}
+        else radio([a.name,'On my feet. Thank you.'],true);}
+      else if(a.bleed<=0){a.dead=true;a.revive=0;sfx.down();shake=Math.max(shake,0.8);
+        const n=a.call,he=a.fem?'She':'He',him=a.fem?'her':'him',live=allies.filter(o=>!o.dead);
+        live.forEach((o,j)=>{o.obj.userData.flinch=1;events.push({t:0.4+j*2.3,fn:()=>{if(!o.dead)radio([o.name,pick(j===0?[`${n}? …${n}. No— ${he}’s gone.`,`${he}’s not breathing. We were right there…`]:[`We were too slow. We were right there.`,`Leave ${him}. We can’t carry ${him}. …God, I’m sorry.`])],j>0);}});});
+        if(!live.length)toast(a.name+' IS DEAD');}
       continue;
     }
     u.rig.rotation.x*=Math.max(0,1-8*dt);u.rig.position.y*=Math.max(0,1-8*dt);
@@ -2055,7 +2114,7 @@ function update(dt){
     if(player.hp>0){const dp=Math.hypot(player.pos.x-e.pos.x,player.pos.z-e.pos.z);if(dp<td*1.7){tg=player;td=dp;}}
     if(!tg)continue;
     e.checkT-=dt;
-    if(!e.aggro&&e.checkT<=0){e.checkT=0.25;const dp=Math.hypot(player.pos.x-e.pos.x,player.pos.z-e.pos.z);if(dp<ENEMY[e.type].aggro){if(los(e.pos.x,e.pos.z,player.pos.x,player.pos.z)){e.aggro=true;if(e.type==='locust')sfx.buzz();if(e.type==='wolf'){sfx.growl();if(!saidWolf&&heardOnce('wolf')){saidWolf=true;events.push({t:1.2,fn:()=>radio(['CALEB','Look at its eyes. Those markings\u2026 that\u2019s not right. Wolves don\u2019t look like that.'])});}enemies.forEach(o=>{if(o!==e&&o.type==='wolf'&&!o.aggro&&o.pos.distanceTo(e.pos)<8)o.aggro=true;});}}}}
+    if(!e.aggro&&e.checkT<=0){e.checkT=0.25;const dp=Math.hypot(player.pos.x-e.pos.x,player.pos.z-e.pos.z);if(dp<ENEMY[e.type].aggro){if(los(e.pos.x,e.pos.z,player.pos.x,player.pos.z)){e.aggro=true;if(e.type==='locust')sfx.buzz();if(e.type==='wolf'){sfx.growl();if(!saidWolf&&heardOnce('wolf')){saidWolf=true;events.push({t:1.2,fn:()=>radio(['NIKON','Look at its eyes. Those markings\u2026 that\u2019s not right. Wolves don\u2019t look like that.'])});}enemies.forEach(o=>{if(o!==e&&o.type==='wolf'&&!o.aggro&&o.pos.distanceTo(e.pos)<8)o.aggro=true;});}}}}
     const dx=tg.pos.x-e.pos.x,dz=tg.pos.z-e.pos.z,d=td||0.001;
     let mvx=0,mvz=0;
     if(e.aggro){aggroCount++;
@@ -2179,17 +2238,17 @@ function update(dt){
     if(genHold>=2.5){genHold=0;setObjective(2);sfx.power();shake=0.3;genObj.userData.lamp.material.color.setHex(0xffc070);
       for(const k in doors)if(doors[k].type==='G')doors[k].unlocked=true;
       fixtures.forEach(f=>{if(!f.out)setTimeout(()=>{if(!f.broken)f.on=true;},300+Math.random()*1500);});
-      radio(['JONAH','Power\u2019s up. Gate\u2019s open. Nobody\u2019s come out to see why.']);
-      events.push({t:3,fn:()=>{[[8,44],[20,44],[28,44],[33,42]].forEach(([x,y])=>{const w=spawnEnemy('wolf',tw(x),tw(y));w.home={x:tw(x),z:tw(y)};w.mode='circle';w.modeT=rand(0.4,1.4);w.aggro=true;});sfx.howl();radio(['HANNAH','Behind us! Treeline!'],true);}});}
+      radio(['POLEMOS','Power\u2019s up. Gate\u2019s open. Nobody\u2019s come out to see why.']);
+      events.push({t:3,fn:()=>{[[8,44],[20,44],[28,44],[33,42]].forEach(([x,y])=>{const w=spawnEnemy('wolf',tw(x),tw(y));w.home={x:tw(x),z:tw(y)};w.mode='circle';w.modeT=rand(0.4,1.4);w.aggro=true;});sfx.howl();radio(['SCAR','Behind us! Treeline!'],true);}});}
   }
-  if(stage===2&&!saidQuiet&&pty<=27){saidQuiet=true;radio(['HANNAH','Lights are on and nobody\u2019s home. Where\u2019s the crew?'],false);}
-  if(stage===3&&pty<=6){setObjective(4);radio(['JONAH','Lift controls by the rim. Hold them and it\u2019ll call the cage up.']);}
+  if(stage===2&&!saidQuiet&&pty<=27){saidQuiet=true;radio(['SCAR','Lights are on and nobody\u2019s home. Where\u2019s the crew?'],false);}
+  if(stage===3&&pty<=6){setObjective(4);radio(['POLEMOS','Lift controls by the rim. Hold them and it\u2019ll call the cage up.']);}
   if(stage===4){
     const cd=consoleObj?Math.hypot(consoleObj.position.x-player.pos.x,consoleObj.position.z-player.pos.z):99;
     if(cd<2.2&&player.hp>0){consoleHold+=dt;
-      if(!liftStarted){liftStarted=true;radio(['JONAH','Cable\u2019s moving. Something down there is moving too.'],true);
+      if(!liftStarted){liftStarted=true;radio(['POLEMOS','Cable\u2019s moving. Something down there is moving too.'],true);
         [[0.8,'scorpion',2],[5,'wolf',2],[6,'scorpion',1],[9.5,'scorpion',3]].forEach(([tt,ty,n])=>events.push({t:tt,fn:()=>{for(let i=0;i<n;i++)pitSpawn(ty);
-          if(ty==='scorpion'){sfx.skitter();if(!saidScorp&&heardOnce('scorpion')){saidScorp=true;radio(['JONAH','Those aren\u2019t wolves. Something with claws is climbing out of the shaft!']);}else{saidScorp=true;toast('MORE COMING UP THE SHAFT');}}else{sfx.growl();toast('MORE COMING UP THE SHAFT');}}}));}}
+          if(ty==='scorpion'){sfx.skitter();if(!saidScorp&&heardOnce('scorpion')){saidScorp=true;radio(['POLEMOS','Those aren\u2019t wolves. Something with claws is climbing out of the shaft!']);}else{saidScorp=true;toast('MORE COMING UP THE SHAFT');}}else{sfx.growl();toast('MORE COMING UP THE SHAFT');}}}));}}
     else consoleHold=Math.max(0,consoleHold-dt*0.6);
     if(consoleScr)consoleScr.material.color.setHex(consoleHold>0?0xc9a24a:0x7a0c08);
     if(consoleHold>=10){consoleHold=0;setObjective(5);sfx.door();toast('THE CABLE STARTS TO TURN');winT=2;}
@@ -2270,6 +2329,7 @@ function missionComplete(){
   $('hud').hidden=true;$('win').hidden=false;
 }
 function showMissions(){
+  hailOn=false;fireOn=0;
   clearWorld();if(!G){buildGrid();buildLevel();}
   state='missions';renderArmory();titleSky();
   ['title','over','win','pause'].forEach(id=>$(id).hidden=true);$('hud').hidden=true;$('missions').hidden=false;
@@ -2318,7 +2378,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='p
 
 // ================= LOOP =================
 const clock=new THREE.Clock();
-buildGrid();buildLevel();buildSets();resize();renderArmory();
+buildGrid();buildLevel();buildSets();buildWeather();resize();renderArmory();
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(clock.getDelta(),0.05);

@@ -1,6 +1,6 @@
 // Tribulation service worker: network-first for the game page so updates arrive,
 // cache fallback so it still opens offline once played.
-const CACHE = 'tribulation-v22';
+const CACHE = 'tribulation-v23';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', e => {
