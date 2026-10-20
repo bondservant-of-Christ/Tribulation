@@ -587,15 +587,16 @@ function buildWeather(){
   horizonGlow.position.set(50,120,-262);horizonGlow.renderOrder=1;horizonGlow.visible=false;scene.add(horizonGlow);
   // Leviathan: the eye belongs to a head too big for any body to be seen. Pure black, only ever a shape against the glow.
   // Units are scaled so the eye sits at (0,0) and lines up with the sky eye from the ending cameras.
-  const U=46,sh=new THREE.Shape(),HP=[[-5.2,-1.0],[-4.2,0.0],[-2.8,0.9],[-1.6,1.75],[-0.2,2.1],[1.2,2.0],[1.7,2.7],[2.2,1.95],[2.9,2.9],[3.4,1.85],[4.0,2.6],[4.3,1.6],[5.0,0.6],[5.6,-1.5],[6.2,-5.0],[6.6,-8.5],[2.6,-8.5],[2.2,-4.5],[1.6,-2.6],[-0.5,-2.35],[-2.6,-2.2],[-4.0,-1.9],[-5.0,-1.5],[-2.4,-1.3]];
-  sh.moveTo(HP[0][0]*U,HP[0][1]*U);for(let i=1;i<HP.length;i++)sh.lineTo(HP[i][0]*U,HP[i][1]*U);
+  // a viper's head in profile, facing right, mouth shut: heavy brow over the eye, spines swept back off the crown, neck dropping out of sight
+  const U=46,sh=new THREE.Shape(),HP=[[-5.4,-0.9],[-5.1,-0.3],[-4.2,0.3],[-2.8,0.9],[-1.7,1.6],[-0.8,2.2],[0.4,2.25],[1.3,1.95],[2.3,2.1],[3.0,2.2],[4.6,3.1],[3.7,2.0],[5.4,2.6],[4.4,1.5],[6.0,1.7],[4.9,0.8],[5.2,-0.6],[5.6,-2.4],[6.0,-4.5],[6.8,-6.5],[7.6,-9.0],[3.4,-9.0],[2.8,-6.5],[2.6,-4.6],[2.2,-3.3],[1.0,-2.6],[-1.5,-2.3],[-3.4,-1.9],[-4.8,-1.4]];
+  sh.moveTo(-HP[0][0]*U,HP[0][1]*U);for(let i=1;i<HP.length;i++)sh.lineTo(-HP[i][0]*U,HP[i][1]*U);
   const hg=new THREE.ShapeGeometry(sh);
   serpent=new THREE.Group();serpent.position.set(50,151,-250);
   // the sky layers write no depth and draw back to front by renderOrder: the render target's depth buffer is too coarse out here to sort them
   const head=new THREE.Mesh(hg,new THREE.MeshBasicMaterial({color:0x000000,transparent:true,depthWrite:false,fog:false}));head.renderOrder=4;serpent.add(head);
   const rim=new THREE.Mesh(hg,new THREE.MeshBasicMaterial({color:0x8a1a0c,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
   rim.scale.setScalar(1.025);rim.renderOrder=3;serpent.add(rim);
-  const halo=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:texGlow,color:0xd8441a,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  const halo=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:texGlow,color:0x9a2a12,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
   halo.scale.set(1500,1200,1);halo.position.set(0,40,0);halo.renderOrder=2;serpent.add(halo);
   serpent.userData={rim,halo};serpent.visible=false;scene.add(serpent);
 }
@@ -613,7 +614,7 @@ function updateWeather(dt){
       ridgeFire.geometry.attributes.color.needsUpdate=true;ridgeFire.geometry.attributes.position.needsUpdate=true;}}
   if(serpent){const r=clamp(fireOn,0,1),on=r>0,rv=clamp((r-0.2)/0.8,0,1),fl=0.85+0.15*Math.sin(t*7.3)*Math.sin(t*3.1);
     horizonGlow.visible=on;serpent.visible=on&&eyeOpen>0.5;
-    horizonGlow.material.opacity=r*0.6*fl;serpent.userData.halo.material.opacity=rv*0.8*fl;serpent.userData.rim.material.opacity=rv*0.9*fl;
+    horizonGlow.material.opacity=r*0.22*fl;serpent.userData.halo.material.opacity=rv*0.3*fl;serpent.userData.rim.material.opacity=rv*0.4*fl;
     fireLight.intensity=on?r*1.6*fl:0;
     // the glow and the head sit far behind the mountains; push the far plane out while they are up
     if(on&&camera.far!==700){camera.far=700;camera.updateProjectionMatrix();}else if(!on&&camera.far!==320){camera.far=320;camera.updateProjectionMatrix();}
