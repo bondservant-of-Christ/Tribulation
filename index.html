@@ -535,6 +535,7 @@ function buildSets(){
   const mtn=new THREE.Group();scene.add(mtn);
   const rockM=new THREE.MeshPhongMaterial({color:0x26282b,flatShading:true,shininess:4}),snowM=new THREE.MeshPhongMaterial({color:0x9aa0a6,flatShading:true,shininess:4});
   for(let i=0;i<34;i++){const a=i/34*TAU+rand(-0.05,0.05),r=rand(170,260),h=rand(45,95),w=rand(30,55);
+    if(Math.abs(a-1.5*Math.PI)<0.5)continue; // leave the north open so nothing stands behind the eye
     const x=50+Math.cos(a)*r,z=60+Math.sin(a)*r;
     const m1=new THREE.Mesh(new THREE.ConeGeometry(w,h,6+(i%3)),rockM);m1.position.set(x,h/2-2,z);m1.rotation.y=rand(0,TAU);mtn.add(m1);
     const m2=new THREE.Mesh(new THREE.ConeGeometry(w*0.38,h*0.38,6+(i%3)),snowM);m2.position.set(x,h-2-h*0.19+0.5,z);m2.rotation.y=m1.rotation.y;mtn.add(m2);}
