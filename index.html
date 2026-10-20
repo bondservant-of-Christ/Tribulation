@@ -272,9 +272,9 @@ scene.fog=new THREE.Fog(0x000000,34,70);
 const camera=new THREE.PerspectiveCamera(50,1,0.08,320);camera.rotation.order='YXZ';
 const rt=new THREE.WebGLRenderTarget(4,4,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
 const postMat=new THREE.ShaderMaterial({
-  uniforms:{tDiffuse:{value:rt.texture},uHurt:{value:0},uLow:{value:0}},
+  uniforms:{tDiffuse:{value:rt.texture},uHurt:{value:0},uLow:{value:0},uBlood:{value:0}},
   vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.0,1.0);}',
-  fragmentShader:`uniform sampler2D tDiffuse;uniform float uHurt;uniform float uLow;varying vec2 vUv;
+  fragmentShader:`uniform sampler2D tDiffuse;uniform float uHurt;uniform float uLow;uniform float uBlood;varying vec2 vUv;
   float bayer(vec2 p){p=floor(mod(p,4.0));vec2 a=mod(p,2.0);vec2 c=floor(p/2.0);
     float s=2.0*a.x+3.0*a.y-4.0*a.x*a.y;float b=2.0*c.x+3.0*c.y-4.0*c.x*c.y;return (4.0*s+b)/16.0;}
   void main(){
@@ -285,6 +285,7 @@ const postMat=new THREE.ShaderMaterial({
     vec2 d=vUv-0.5;c*=1.0-dot(d,d)*1.4;
     float pulse=uLow*(0.5+0.5*sin(gl_FragCoord.y*0.0));
     c=mix(c,vec3(l*1.3,l*0.25,l*0.22),clamp(uHurt+pulse*0.25,0.0,1.0)*0.75);
+    c=mix(c,vec3(l*1.5+0.06,l*0.08,l*0.06),clamp(uBlood,0.0,1.0)*0.85);c+=vec3(0.45,0.0,0.0)*uBlood*dot(d,d)*2.2;
     float lv=22.0;
     c+=(bayer(gl_FragCoord.xy)-0.5)/lv;
     c=floor(c*lv+0.5)/lv;
@@ -351,7 +352,9 @@ const lightPool=[];for(let i=0;i<5;i++){const l=new THREE.PointLight(0xffffff,0,
 
 // ================= OUTSIDE: the sky eye (a sun with a third gone dark), burnt ground, embers =================
 const eye=new THREE.Group();eye.position.set(50,70,-90);
-let seenEye=false;try{seenEye=localStorage.getItem('tribulation.eye')==='1';}catch(e){}
+let seenEye=false,heardLines={};try{heardLines=JSON.parse(localStorage.getItem('tribulation.lines')||'{}');}catch(e){}
+function heardOnce(k){if(heardLines[k])return false;heardLines[k]=1;try{localStorage.setItem('tribulation.lines',JSON.stringify(heardLines));}catch(e){}return true;}
+let wrath=0,ffKills=0,bloodT=0,bloodAmp=0;try{seenEye=localStorage.getItem('tribulation.eye')==='1';}catch(e){}
 let eyeOpen=seenEye?1:0,skyBlot=seenEye?1:0.45;
 function titleSky(){eyeOpen=seenEye?1:0;skyBlot=seenEye?1:0.45;}
 const stars=(function(){
@@ -1434,14 +1437,16 @@ function makeAlly(def){
 }
 const ENEMY={
   wolf:{hp:44,speed:5.0,r:0.52,reach:1.45,dmg:13,rate:0.85,aggro:13,h:1.25},
-  scorpion:{hp:80,speed:3.0,r:0.62,reach:1.75,dmg:15,rate:1.4,aggro:16,h:1.25},
+  scorpion:{hp:150,speed:3.4,r:1.05,reach:2.5,dmg:22,rate:1.2,aggro:18,h:2.2,scale:1.85},
   marked:{hp:50,speed:1.5,r:0.45,reach:1.35,dmg:9,rate:1.4,aggro:8,h:1.9},
   locust:{hp:28,speed:4.4,r:0.55,reach:1.4,dmg:7,rate:1.0,aggro:10,h:1.6},
   abaddon:{hp:1100,speed:1.4,r:1.5,reach:3,dmg:24,rate:1.6,aggro:99,h:6.5}
 };
 function spawnEnemy(type,x,z){
   const def=ENEMY[type];const b=type==='wolf'?makeWolf():type==='scorpion'?makeScorpion():type==='marked'?makeMarked():type==='locust'?makeLocust():makeAbaddon();
-  const e=Object.assign({},def,b,{type,obj:b.g,pos:b.g.position,max:def.hp,cd:rand(0,1),flash:0,alive:true,dying:0,ph:rand(0,10),aggro:false,lunge:0,checkT:rand(0,.3)});
+  const W=1+wrath*0.35;
+  const e=Object.assign({},def,b,{type,obj:b.g,pos:b.g.position,max:def.hp*W,hp:def.hp*W,dmg:def.dmg*(1+wrath*0.3),speed:def.speed*(1+wrath*0.1),cd:rand(0,1),flash:0,alive:true,dying:0,ph:rand(0,10),aggro:false,lunge:0,checkT:rand(0,.3),bs:def.scale||1,chargeCD:rand(1,3)});
+  if(def.scale)b.g.scale.setScalar(def.scale);
   e.mats=trackMats(e.obj);
   e.pos.set(x,0,z);e.obj.rotation.y=rand(0,TAU);scene.add(e.obj);enemies.push(e);return e;
 }
@@ -1495,7 +1500,7 @@ function startMission(){
     else addPickup(c,wx,wz);
   });
   laser=new THREE.Mesh(box(0.025,0.025,1),BASIC(0xff2a1a,{transparent:true,opacity:.7}));laser.visible=false;scene.add(laser);
-  kills=0;shake=0;missionT=0;stage=0;consoleHold=0;genHold=0;saidQuiet=false;events=[];liftStarted=false;saidWolf=false;saidScorp=false;tracers.forEach(r=>scene.remove(r.m));tracers=[];vmS.cur=null;vmS.aimB=0;boss=null;secretsFound=[];winT=0;trail=[];aimT=0;aiming=false;
+  kills=0;shake=0;missionT=0;wrath=0;ffKills=0;bloodT=0;bloodAmp=0;stage=0;consoleHold=0;genHold=0;saidQuiet=false;events=[];liftStarted=false;saidWolf=false;saidScorp=false;tracers.forEach(r=>scene.remove(r.m));tracers=[];vmS.cur=null;vmS.aimB=0;boss=null;secretsFound=[];winT=0;trail=[];aimT=0;aiming=false;
   camTarget.copy(player.pos);
   buildSquadHud();hudCache={};
   ['title','missions','over','win','pause'].forEach(id=>$(id).hidden=true);$('hud').hidden=false;
@@ -1604,15 +1609,30 @@ function hitscan(muzzleP,fwd,spread,range,dmg,breaker){
   else if(kind!=='none')spark3(end);
   _tv.copy(muzzleP).addScaledVector(_hd,0.3);tracer(_tv,end);
 }
-const FF_LINES={hit:['Check your fire!','That was me! Watch it!','You hit me! I\u2019m on your side!'],
-  kill:n=>[`You shot ${n}. ${n} is gone.`,`${n}! No\u2026 you killed ${n}.`,`Hold your fire! ${n} is dead.`]};
+const FF_LINES={hit:['Check your fire!','That was me! Watch it!','You hit me! I’m on your side!']};
 function shootAlly(a,head){
   if(a.dead)return;
   if(head||a.downed){
-    a.dead=true;a.downed=true;a.hp=0;a.revive=0;sfx.down();shake=Math.max(shake,0.3);
-    const w=allies.find(o=>!o.dead&&o!==a);
-    if(w)radio([w.name,FF_LINES.kill(a.name)[Math.floor(Math.random()*3)]]);
-    else toast(a.name+' IS DEAD');
+    const deliberate=head&&!enemies.some(e=>e.alive&&e.aggro&&e.pos.distanceTo(player.pos)<20);
+    a.dead=true;a.downed=true;a.hp=0;a.revive=0;sfx.down();
+    ffKills++;shake=Math.max(shake,2.2);sfx.rumble();bloodAmp=Math.min(1,0.35+ffKills*0.25);bloodT=1;
+    const live=allies.filter(o=>!o.dead);
+    const n=a.name,him=n==='HANNAH'?'her':'him',he=n==='HANNAH'?'She':'He';
+    const lines=deliberate?[
+      [`WHAT DID YOU DO?! There was nothing there!`,`You shot ${n}. In the head. On purpose.`,`Get away from me. GET AWAY FROM ME!`],
+      [`${n}?! ${n}! …${he}’s gone. You killed ${him}.`,`Don’t point that thing at me. Don’t you dare.`,`Something’s wrong with you. Something got into you down here.`]
+    ]:[
+      [`HOLD YOUR FIRE! HOLD YOUR FIRE!`,`${n} is down! ${n}— no, no, no…`,`You hit ${him}. You hit ${n}!`],
+      [`${he}’s not breathing! ${he}’s not—`,`Watch where you’re shooting! God help us…`,`We can’t lose anyone else. Do you hear me?!`]
+    ];
+    live.forEach((o,i)=>{const set=lines[i%2];o.obj.userData.flinch=1;o.fearT=deliberate?7:3;
+      events.push({t:0.25+i*2.2,fn:()=>{if(!o.dead)radio([o.name,set[Math.floor(Math.random()*set.length)]],i>0);}});});
+    if(!live.length)toast(n+' IS DEAD');
+    if(deliberate){
+      wrath++;
+      enemies.forEach(e=>{if(!e.alive)return;e.hp*=1.35;e.max*=1.35;e.dmg*=1.3;e.speed*=1.1;});
+      events.push({t:3.5,fn:()=>{banner('','Something in the dark is pleased.');sfx.rumble();}});
+    }
   }else{
     const wasUp=!a.downed;a.hurt(65);
     if(wasUp&&!a.downed)radio([a.name,FF_LINES.hit[Math.floor(Math.random()*3)]],true);
@@ -1821,7 +1841,7 @@ function update(dt){
     let dx=tp.x-a.pos.x,dz=tp.z-a.pos.z,d=Math.hypot(dx,dz),mv=0;
     if(d>0.5){const sp=Math.min(6.2,d*3.2);a.pos.x+=dx/d*sp*dt;a.pos.z+=dz/d*sp*dt;mv=Math.min(1,sp/5.5);}
     if(Math.hypot(a.pos.x-player.pos.x,a.pos.z-player.pos.z)>18){a.pos.set(tp.x,0,tp.z);}
-    for(const b of [player,...allies]){if(b===a)continue;const R=b===player?1.25:0.8,ex=a.pos.x-b.pos.x,ez=a.pos.z-b.pos.z,ed=Math.hypot(ex,ez);if(ed<R&&ed>0){const k=b===player?0.25:0.5;a.pos.x+=ex/ed*(R-ed)*k;a.pos.z+=ez/ed*(R-ed)*k;}}
+    for(const b of [player,...allies]){if(b===a)continue;const R=b===player?(a.fearT>0?2.6:1.25):0.8,ex=a.pos.x-b.pos.x,ez=a.pos.z-b.pos.z,ed=Math.hypot(ex,ez);if(ed<R&&ed>0){const k=b===player?0.25:0.5;a.pos.x+=ex/ed*(R-ed)*k;a.pos.z+=ez/ed*(R-ed)*k;}}
     collide(a.pos,0.4);
     a.cd-=dt;let tgt=null,bd=16*16;
     for(const e of enemies){if(!e.alive||!e.aggro||e.pos.y<-1)continue;const q=(e.pos.x-a.pos.x)**2+(e.pos.z-a.pos.z)**2;if(q<bd&&los(a.pos.x,a.pos.z,e.pos.x,e.pos.z)){bd=q;tgt=e;}}
@@ -1835,12 +1855,14 @@ function update(dt){
     {const tpx=player.pos.x-a.pos.x,tpz=player.pos.z-a.pos.z,pd=Math.hypot(tpx,tpz);
      const toMe=pd>0.1?Math.acos(clamp(-(aimDir.x*tpx+aimDir.z*tpz)/pd,-1,1)):3;
      const rel=Math.atan2(Math.sin(Math.atan2(tpx,tpz)-a.obj.rotation.y),Math.cos(Math.atan2(tpx,tpz)-a.obj.rotation.y));
-     if(tgt){u.headYawT=0;u.headPitchT=0;}
+     if(a.fearT>0)a.fearT-=dt;
+     if(a.fearT>0&&!tgt){u.headYawT=0;u.headPitchT=0;face(a.obj,tpx,tpz,dt,8);}
+     else if(tgt){u.headYawT=0;u.headPitchT=0;}
      else if(u.talkT>0||(pd<6&&toMe<0.22&&!combatNear)){u.headYawT=rel;u.headPitchT=-0.05;if(pd<6&&toMe<0.22&&!(a.seen>0)){a.seen=6;u.talkT=0.6;}}
      else if(mv>0.1){u.headYawT=Math.sin(t*0.35+i*2.1)*0.45;u.headPitchT=0;}
      else{u.headYawT=Math.sin(t*0.35+i*2.3)*0.22+Math.sin(t*1.1+i)*0.05;u.headPitchT=Math.sin(t*0.3+i)*0.04;}
      a.seen=Math.max(0,(a.seen||0)-dt);}
-    animHuman(a.obj,dt,mv,tgt?1:(settle&&mv<0.1?0.32:0),a.reload>0?1-a.reload/2.2:-1);
+    animHuman(a.obj,dt,mv,tgt||a.fearT>0?1:(settle&&mv<0.1?0.32:0),a.reload>0?1-a.reload/2.2:-1);
   }
 
   // ---- flow field
@@ -1850,7 +1872,7 @@ function update(dt){
   let aggroCount=0;
   const team=teamAlive();
   for(const e of enemies){
-    if(!e.alive){e.dying-=dt;const k=Math.max(0,e.dying/0.7);e.obj.scale.set(1+(1-k)*0.4,Math.max(0.01,k),1+(1-k)*0.4);if(e.dying<=0){scene.remove(e.obj);e.gone=true;}continue;}
+    if(!e.alive){e.dying-=dt;const k=Math.max(0,e.dying/0.7);e.obj.scale.set((1+(1-k)*0.4)*e.bs,Math.max(0.01,k)*e.bs,(1+(1-k)*0.4)*e.bs);if(e.dying<=0){scene.remove(e.obj);e.gone=true;}continue;}
     e.ph+=dt;e.cd-=dt;
     if(e.flash>0)e.flash-=dt;
     e.mats.forEach(m=>m.emissive.setHex(e.flash>0?0xffffff:m.userData.base));
@@ -1860,7 +1882,7 @@ function update(dt){
     if(player.hp>0){const dp=Math.hypot(player.pos.x-e.pos.x,player.pos.z-e.pos.z);if(dp<td*1.7){tg=player;td=dp;}}
     if(!tg)continue;
     e.checkT-=dt;
-    if(!e.aggro&&e.checkT<=0){e.checkT=0.25;const dp=Math.hypot(player.pos.x-e.pos.x,player.pos.z-e.pos.z);if(dp<ENEMY[e.type].aggro){if(los(e.pos.x,e.pos.z,player.pos.x,player.pos.z)){e.aggro=true;if(e.type==='locust')sfx.buzz();if(e.type==='wolf'){sfx.growl();if(!saidWolf){saidWolf=true;events.push({t:1.2,fn:()=>radio(['CALEB','Look at its eyes. Those markings\u2026 that\u2019s not right. Wolves don\u2019t look like that.'])});}enemies.forEach(o=>{if(o!==e&&o.type==='wolf'&&!o.aggro&&o.pos.distanceTo(e.pos)<8)o.aggro=true;});}}}}
+    if(!e.aggro&&e.checkT<=0){e.checkT=0.25;const dp=Math.hypot(player.pos.x-e.pos.x,player.pos.z-e.pos.z);if(dp<ENEMY[e.type].aggro){if(los(e.pos.x,e.pos.z,player.pos.x,player.pos.z)){e.aggro=true;if(e.type==='locust')sfx.buzz();if(e.type==='wolf'){sfx.growl();if(!saidWolf&&heardOnce('wolf')){saidWolf=true;events.push({t:1.2,fn:()=>radio(['CALEB','Look at its eyes. Those markings\u2026 that\u2019s not right. Wolves don\u2019t look like that.'])});}enemies.forEach(o=>{if(o!==e&&o.type==='wolf'&&!o.aggro&&o.pos.distanceTo(e.pos)<8)o.aggro=true;});}}}}
     const dx=tg.pos.x-e.pos.x,dz=tg.pos.z-e.pos.z,d=td||0.001;
     let mvx=0,mvz=0;
     if(e.aggro){aggroCount++;
@@ -1877,6 +1899,7 @@ function update(dt){
         else if(e.mode==='lunge'){mvx=dx/d;mvz=dz/d;spMul=1.75;if(d<e.reach&&e.cd<=0){e.cd=e.rate;tg.hurt(e.dmg,e.pos);e.lunge=0.3;sfx.bite();e.mode='retreat';e.modeT=0.9;}else if(e.modeT<=0){e.mode='retreat';e.modeT=0.6;}}
         else{mvx=-dx/d;mvz=-dz/d;spMul=0.8;if(e.modeT<=0){e.mode='circle';e.modeT=rand(0.9,2.0);}}
       }
+      if(e.type==='scorpion'&&see){e.chargeCD-=dt;if(e.charge>0){e.charge-=dt;spMul=2.6;}else if(e.chargeCD<=0&&d>3&&d<10){e.charge=0.9;e.chargeCD=rand(3,5);sfx.skitter();}}
       e.spMul=spMul;
       if(e.type==='locust'&&see&&d>2){const w=Math.sin(e.ph*4)*0.55;const px=-mvz,pz=mvx;mvx+=px*w;mvz+=pz*w;}
       if(e.type!=='wolf'&&d<e.reach&&e.cd<=0&&see){e.cd=e.rate;tg.hurt(e.dmg,e.pos);e.lunge=0.25;}
@@ -1886,7 +1909,7 @@ function update(dt){
       if(e.type==='wolf'){const a=e.ph*0.35;const hx=e.home.x+Math.cos(a)*2.5-e.pos.x,hz=e.home.z+Math.sin(a)*2.5-e.pos.z,hl=Math.hypot(hx,hz)||1;mvx=hx/hl*0.5;mvz=hz/hl*0.5;face(e.obj,hx,hz,dt,3);}
       if(e.type==='locust'){mvx=Math.cos(e.ph*0.7)*0.25;mvz=Math.sin(e.ph*0.7)*0.25;face(e.obj,-Math.sin(e.ph*0.7),Math.cos(e.ph*0.7),dt,2);}
     }
-    const sp=e.speed*(e.aggro?(e.type==='wolf'?(e.spMul||1):1):0.4);
+    const sp=e.speed*(e.aggro?(e.spMul||1):0.4);
     e.pos.x+=mvx*sp*dt;e.pos.z+=mvz*sp*dt;
     if(e.lunge>0)e.lunge-=dt;
     // animation
@@ -1993,7 +2016,7 @@ function update(dt){
     if(cd<2.2&&player.hp>0){consoleHold+=dt;
       if(!liftStarted){liftStarted=true;radio(['JONAH','Cable\u2019s moving. Something down there is moving too.'],true);
         [[0.8,'scorpion',2],[5,'wolf',2],[6,'scorpion',1],[9.5,'scorpion',3]].forEach(([tt,ty,n])=>events.push({t:tt,fn:()=>{for(let i=0;i<n;i++)pitSpawn(ty);
-          if(ty==='scorpion'){sfx.skitter();if(!saidScorp){saidScorp=true;radio(['JONAH','Those aren\u2019t wolves. Something with claws is climbing out of the shaft!']);}else toast('MORE COMING UP THE SHAFT');}else{sfx.growl();toast('MORE COMING UP THE SHAFT');}}}));}}
+          if(ty==='scorpion'){sfx.skitter();if(!saidScorp&&heardOnce('scorpion')){saidScorp=true;radio(['JONAH','Those aren\u2019t wolves. Something with claws is climbing out of the shaft!']);}else{saidScorp=true;toast('MORE COMING UP THE SHAFT');}}else{sfx.growl();toast('MORE COMING UP THE SHAFT');}}}));}}
     else consoleHold=Math.max(0,consoleHold-dt*0.6);
     if(consoleScr)consoleScr.material.color.setHex(consoleHold>0?0xc9a24a:0x7a0c08);
     if(consoleHold>=10){consoleHold=0;setObjective(5);sfx.door();toast('THE CABLE STARTS TO TURN');winT=2;}
@@ -2027,6 +2050,8 @@ function updateAmbient(dt){
   if(radioFull){radioShown=Math.min(radioFull.length,radioShown+dt*45);$('radioText').textContent=radioFull.slice(0,Math.floor(radioShown));radioT-=dt;if(radioT<=0){radioFull='';$('radioText').textContent='';$('radioWho').textContent='';}}
   if(hurtT>0)hurtT-=dt;
   postMat.uniforms.uHurt.value=Math.max(0,hurtT*2);
+  if(bloodT>0)bloodT=Math.max(0,bloodT-dt*0.45);
+  postMat.uniforms.uBlood.value=bloodT>0?bloodAmp*Math.pow(bloodT,0.6)*(0.75+0.25*Math.sin(t*9)):(ffKills>0&&state==='play'?ffKills*0.035*(0.5+0.5*Math.sin(t*1.6)):0);
   postMat.uniforms.uLow.value=player&&player.hp<30&&player.hp>0&&state==='play'?(0.5+0.5*Math.sin(t*5)):0;
 }
 
