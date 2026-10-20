@@ -99,6 +99,8 @@ blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-siz
 .mission .t{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:.08em}
 .mission .s{font-size:17px;opacity:.7}
 .mission[disabled]{opacity:.38;cursor:default}
+.mission.sel{border-color:var(--brass);background:rgba(201,162,74,.12)}.mission.sel .num{color:var(--brass)}
+#loMsg{color:var(--blood);opacity:1;min-height:1em}
 .mission:not([disabled]):hover{border-color:var(--blood)}
 .armory{display:flex;gap:10px;flex-wrap:wrap;font-size:17px}
 .armory span{border:1px solid var(--rust);padding:2px 8px;letter-spacing:.1em}
@@ -247,7 +249,7 @@ body.noCursor #c{cursor:none}
     </div>
     <div class="lbl">ARMORY · HIDDEN WEAPONS FOUND</div>
     <div class="armory" id="armory"></div>
-    <button class="ghost" id="backTitle">BACK</button>
+    <div class="row"><button class="ghost" id="msLoadout">LOADOUT</button><button class="ghost" id="backTitle">BACK</button></div>
   </div>
 </div>
 
@@ -255,8 +257,10 @@ body.noCursor #c{cursor:none}
   <div class="panel">
     <div class="eyebrow">HORSEMEN · QUARTERMASTER</div>
     <h2>Loadout</h2>
-    <p class="setp uc">UNDER CONSTRUCTION</p>
-    <p class="setp">The quartermaster's cage is still locked. Check back after the next deployment.</p>
+    <p class="setp">Take two guns into the field. Anything you find out there goes in your two free slots.</p>
+    <div class="lbl" id="loCount">CARRYING 1/2</div>
+    <div class="missions" id="loList"></div>
+    <p class="setp" id="loMsg"></p>
     <button class="ghost" id="loBack">BACK</button>
   </div>
 </div>
@@ -1713,8 +1717,10 @@ const WEAP={
   hook:{name:'THE HOOK',gun:'long',mode:'release',mag:1,dmg:130,cd:0.5,reload:2.1,ammo:'j',pellets:1,spread:0.003,spreadLoose:0.04,focus:0.6,range:42,kick:0.13,shake:0.35,snd:'hook',pierce:3},
   watch:{name:'WATCHMAN',gun:'long',mode:'release',mag:5,dmg:62,cd:0.55,reload:2.4,ammo:'m',pellets:1,spread:0.002,spreadLoose:0.06,focus:0.8,range:60,kick:0.07,shake:0.2,snd:'watch'}
 };
-const SECRETS=['jericho','thunders','hook','watch'];
+const SECRETS=['jericho','thunders','hook','watch'],SECRET_AMMO={jericho:8,thunders:60,hook:3,watch:15},MAXGUNS=4;
+function validLoadout(){const ok=id=>id==='witness'||(SECRETS.includes(id)&&armory.includes(id));let l=[...new Set(loadout)].filter(ok).slice(0,2);if(!l.length)l=['witness'];return l;}
 let armory=[];try{armory=JSON.parse(localStorage.getItem('tribulation.armory')||'[]');}catch(e){armory=[];}
+let loadout=['witness'];try{const l=JSON.parse(localStorage.getItem('tribulation.loadout')||'null');if(Array.isArray(l))loadout=l;}catch(e){}
 function saveArmory(){try{localStorage.setItem('tribulation.armory',JSON.stringify(armory));}catch(e){}}
 
 // ================= NOTES & RADIO =================
@@ -1745,9 +1751,9 @@ let laser;
 
 function makePlayer(){
   const o=makeHuman({armor:0x2a2c2e,armor2:0x151617,glow:0xd8302a,suit:0x1e2022,guns:['pistol','long']});scene.add(o);
-  const w=['witness',...SECRETS.filter(a=>armory.includes(a))];
+  const w=validLoadout();
   const mags={};w.forEach(k=>mags[k]=WEAP[k].mag);
-  return {obj:o,pos:o.position,hp:100,max:100,weapons:w,cur:0,mags,ammo:{p:16,s:armory.includes('jericho')?8:0,r:armory.includes('thunders')?60:0,j:armory.includes('hook')?3:0,m:armory.includes('watch')?15:0},keys:{},bandages:1,wrap:null,cd:0,reload:0,walk:0,isPlayer:true,yaw:0,pitch:0,kick:0,moveAmt:0,
+  return {obj:o,pos:o.position,hp:100,max:100,weapons:w,cur:0,mags,ammo:{p:16,s:w.includes('jericho')?8:0,r:w.includes('thunders')?60:0,j:w.includes('hook')?3:0,m:w.includes('watch')?15:0},keys:{},bandages:1,wrap:null,cd:0,reload:0,walk:0,isPlayer:true,yaw:0,pitch:0,kick:0,moveAmt:0,
     hurt(d,src){if(this.hp<=0||state!=='play')return;this.hp-=d;shake=Math.max(shake,0.6);hurtT=0.45;this.kick+=0.035;sfx.hurt();
       if(src){const ang=Math.atan2(src.x-this.pos.x,src.z-this.pos.z),fa=Math.atan2(-Math.sin(this.yaw),-Math.cos(this.yaw));const rel=Math.atan2(Math.sin(ang-fa),Math.cos(ang-fa));showDmgDir(-rel*180/Math.PI);}
       if(this.hp<=0){this.hp=0;gameOver();}}};
@@ -1927,7 +1933,7 @@ function bakeFurniture(){
 // ---- the plan: what each room is, and what is in it
 function buildFurniture(){
   _sd=4077;const C=addContainer,P=addProp,PI=Math.PI;
-  const S_=armory.includes('jericho')?'s':'S',F_=armory.includes('thunders')?'r':'F';
+  const S_='S',F_='F';
   // YARD — a supply drop by the west trees, fuel and spares by the generator shed
   P('pallet',12,40,{rot:0.2});C('crate',13,41,{open:1,rot:-0.3});C('crate',8,43,{rot:0.25,items:['a']});P('papers',13,40,{n:3,spread:1.6});
   P('drums',30,36,{rot:0.4});C('crate',32,31,{rot:-0.2,items:['h']});C('crate',28,31,{rot:0.1,cash:['yard',120],fl:'Spare filters and a crowbar.'});P('pallet',26,37,{rot:-0.1});C('crate',27,38,{open:1,rot:0.6});
@@ -1980,9 +1986,19 @@ function giveItem(c,ct){
   if(c==='C'){cash+=ct.cashAmt;if(!stashes.includes(ct.cashId))stashes.push(ct.cashId);saveProg();return ct.cashAmt+' KR';}
   if(c==='k'){player.keys.k=true;setObjective(3);radio(['CMDR. VALE','You have the shaft key. The lift is north, past the red door. Bring the crew up if they’re down there.']);return PICK.k.label;}
   if(c==='b'){player.keys.b=true;return 'BLUE KEYCARD · SOMETHING ELSE IS LOCKED IN HERE';}
-  if(SECRET_KIND[c]){const id=SECRET_KIND[c];player.weapons.push(id);player.mags[id]=WEAP[id].mag;player.ammo[WEAP[id].ammo]+=({jericho:8,thunders:60,hook:3,watch:15})[id];
-    if(!armory.includes(id)){armory.push(id);saveArmory();}secretsFound.push(id);sfx.secret();banner('SECRET · '+SECRET_INFO[id].name,SECRET_INFO[id].sub);selectWeapon(player.weapons.length-1);return '';}
+  if(SECRET_KIND[c])return takeWeapon(SECRET_KIND[c]);
   return null;
+}
+function takeWeapon(id){
+  const w=WEAP[id];
+  if(!secretsFound.includes(id))secretsFound.push(id);
+  if(player.weapons.includes(id)){player.ammo[w.ammo]+=SECRET_AMMO[id];return w.name+' AMMO';}
+  if(player.weapons.length>=MAXGUNS){sfx.denied();toast('NO FREE SLOT · LEAVING THE '+w.name);return null;}
+  player.weapons.push(id);player.mags[id]=w.mag;player.ammo[w.ammo]+=SECRET_AMMO[id];
+  const first=!armory.includes(id);if(first){armory.push(id);saveArmory();}
+  selectWeapon(player.weapons.length-1);
+  if(first){sfx.secret();banner('SECRET · '+SECRET_INFO[id].name,SECRET_INFO[id].sub);return '';}
+  return w.name;
 }
 function searchContainer(c){
   if(c.open<1){if(c.opening)return;c.opening=true;
@@ -1992,7 +2008,7 @@ function searchContainer(c){
   const got=[],kept=[];
   for(const it of c.items){const m=giveItem(it,c);if(m===null)kept.push(it);else if(m)got.push(m);}
   if(got.length){sfx.pickup();toast('+ '+got.join(' · + '));}
-  else if(kept.length)toast('BANDAGES · YOUR POUCH IS FULL');
+  else if(kept.includes('h'))toast('BANDAGES · YOUR POUCH IS FULL');
   c.items=kept;fillSlot(c);if(!kept.length){c.searched=true;if(c.flavor&&got.length)events.push({t:2.6,fn:()=>toast(c.flavor)});}
 }
 function containerOpened(c){if(!c.items.length){c.searched=true;toast(c.flavor||'Empty.');}}
@@ -2333,7 +2349,7 @@ document.addEventListener('mouseout',e=>{if(!e.relatedTarget)mouseSeen=false;});
 document.addEventListener('pointerlockchange',()=>{const l=!!document.pointerLockElement;if(!l&&wasLocked){lockLostAt=performance.now();if(state==='play')togglePause();}wasLocked=l;});
 addEventListener('wheel',e=>{if(state==='play'&&Math.abs(e.deltaY)>20)swapWeapon();},{passive:true});
 addEventListener('keydown',e=>{keys[e.code]=true;if(state!=='play'&&state!=='paused')return;if(state==='play'&&/^(Key[WASD]|Arrow)/.test(e.code))tryLock();if(e.code==='KeyR')startReload();if(e.code==='KeyE'||e.code==='KeyF')interact();if(e.code==='KeyH')startHeal();if(e.code==='KeyQ')swapWeapon();
-  if(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'){const i=+e.code.slice(5)-1;if(player.weapons[i])selectWeapon(i);}
+  if(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'||e.code==='Digit4'){const i=+e.code.slice(5)-1;if(player.weapons[i])selectWeapon(i);}
   if((e.code==='Escape'||e.code==='KeyP')&&performance.now()-lockLostAt>400)togglePause();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const tmpV=new V3();
@@ -2608,10 +2624,8 @@ function update(dt){
       else if(c==='j')player.ammo.j+=2;else if(c==='m')player.ammo.m+=10;
       else if(c==='k'){player.keys.k=true;setObjective(3);radio(['CMDR. VALE','You have the shaft key. The lift is north, past the red door. Bring the crew up if they\u2019re down there.']);}
       else if(c==='b'){player.keys.b=true;msg='BLUE KEYCARD \u00b7 SOMETHING ELSE IS LOCKED IN HERE';}
-      else if(SECRET_KIND[c]){const id=SECRET_KIND[c];player.weapons.push(id);player.mags[id]=WEAP[id].mag;player.ammo[WEAP[id].ammo]+=({jericho:8,thunders:60,hook:3,watch:15})[id];
-        if(!armory.includes(id)){armory.push(id);saveArmory();}secretsFound.push(id);
-        sfx.secret();banner('SECRET \u00b7 '+SECRET_INFO[id].name,SECRET_INFO[id].sub);selectWeapon(player.weapons.length-1);k.taken=true;}
-      if(!SECRET_KIND[c]){sfx.pickup();toast('+ '+msg);}
+      else if(SECRET_KIND[c]){const r=takeWeapon(SECRET_KIND[c]);if(r===null)continue;msg=r;}
+      if(msg){sfx.pickup();toast('+ '+msg);}
       k.taken=true;scene.remove(k.m);if(k.glow)scene.remove(k.glow);
     }
   }
@@ -2752,8 +2766,24 @@ function reloadFresh(){const u=new URL(location.href);u.searchParams.set('r',Dat
 function renderCollection(){
   $('colStats').innerHTML=`<span>LOGS <b>${notesFound.length}/${NOTES.length}</b></span><span>ARMORY <b>${SECRETS.filter(a=>armory.includes(a)).length}/${SECRETS.length}</b></span><span>KRONER <b>${cash}</b></span>`;
   $('colList').innerHTML=NOTES.map((N,i)=>notesFound.includes(i)?`<details><summary>${N.t}</summary><p>${N.b}<cite>\u2014 ${N.c}</cite></p></details>`:`<div class="lock">\u2014 NOT RECOVERED \u2014</div>`).join('');}
-$('toLoadout').onclick=()=>{$('title').hidden=true;$('loadout').hidden=false;};
-$('loBack').onclick=()=>{$('loadout').hidden=true;$('title').hidden=false;};
+// ---- loadout: two guns in, two free slots for whatever you find
+let loFrom='title';
+const LO_INFO={witness:'Sidearm. Fires when you let go; a steady hold hits harder.'};
+function renderLoadout(){
+  const lo=validLoadout(),ids=['witness',...SECRETS];
+  $('loCount').textContent=`CARRYING ${lo.length}/2`;
+  $('loList').innerHTML=ids.map(id=>{const open=id==='witness'||armory.includes(id),sel=lo.includes(id);
+    return open?`<button class="mission${sel?' sel':''}" data-w="${id}"><span class="num">${sel?lo.indexOf(id)+1:'·'}</span><span class="t">${WEAP[id].name}</span><span class="s">${id==='witness'?LO_INFO.witness:SECRET_INFO[id].sub}</span></button>`
+      :`<button class="mission" disabled><span class="num">?</span><span class="t">— NOT YET FOUND —</span><span class="s">Hidden somewhere in the field</span></button>`;}).join('');
+  $('loList').querySelectorAll('button[data-w]').forEach(b=>b.onclick=()=>{const id=b.dataset.w;let l=validLoadout();$('loMsg').textContent='';
+    if(l.includes(id)){if(l.length<=1){$('loMsg').textContent='You can’t go in empty-handed.';return;}l=l.filter(x=>x!==id);}
+    else{if(l.length>=2){$('loMsg').textContent='Two guns only. Put one back first.';return;}l.push(id);}
+    loadout=l;try{localStorage.setItem('tribulation.loadout',JSON.stringify(l));}catch(e){}sfx.click();renderLoadout();});
+}
+function openLoadout(from){loFrom=from;$(from).hidden=true;$('loMsg').textContent='';renderLoadout();$('loadout').hidden=false;}
+$('toLoadout').onclick=()=>openLoadout('title');
+$('msLoadout').onclick=()=>openLoadout('missions');
+$('loBack').onclick=()=>{$('loadout').hidden=true;if(loFrom==='missions')renderArmory();$(loFrom).hidden=false;};
 // ---- Remember: rewatch scenes already seen
 const MEMORIES=[
   {id:'opening',num:'I',t:'STANDING ORDER',s:'Vale sends the Horsemen to Site 9',cine:()=>OPENING},
@@ -3496,7 +3526,7 @@ function addNote2(idx,x,z){const g=new THREE.Group();g.position.set(x,0,z);mk(bo
   const scr=mk(box(0.3,0.01,0.4),BASIC(0xc9a24a),0,0.41,0,g);scr.rotation.y=0.3;scene.add(g);notes.push({g,scr,idx,x,z});}
 function buildFurniture2(){
   _sd=5150;const C=addContainer,P=addProp,PI=Math.PI;
-  const J_=armory.includes('hook')?'j':'J',Y_=armory.includes('watch')?'m':'Y';
+  const J_='J',Y_='Y';
   // the Olsen house: a kitchen someone barricaded
   P('table',15.5,51,{rot:0.2});P('chair',15,51,{ox:-0.3,rot:PI/2,tip:1});P('chair',16,51.5,{rot:-1});
   C('cabinet',14,50,{w:'N',items:['h']});P('bookshelf',17,50,{w:'N'});C('crate',14,52,{w:'S',items:['a']});P('papers',16,52,{n:4});
