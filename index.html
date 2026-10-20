@@ -1660,7 +1660,7 @@ function startMission(){
     else addPickup(c,wx,wz);
   });
   laser=new THREE.Mesh(box(0.025,0.025,1),BASIC(0xff2a1a,{transparent:true,opacity:.7}));laser.visible=false;scene.add(laser);
-  kills=0;shake=0;missionT=0;wrath=0;ffKills=0;bloodT=0;bloodAmp=0;stage=0;consoleHold=0;genHold=0;saidQuiet=false;events=[];liftStarted=false;saidWolf=false;saidScorp=false;tracers.forEach(r=>scene.remove(r.m));tracers=[];vmS.cur=null;vmS.aimB=0;boss=null;secretsFound=[];winT=0;trail=[];aimT=0;aiming=false;
+  kills=0;shake=0;missionT=0;deathT=0;wrath=0;ffKills=0;bloodT=0;bloodAmp=0;stage=0;consoleHold=0;genHold=0;saidQuiet=false;events=[];liftStarted=false;saidWolf=false;saidScorp=false;tracers.forEach(r=>scene.remove(r.m));tracers=[];vmS.cur=null;vmS.aimB=0;boss=null;secretsFound=[];winT=0;trail=[];aimT=0;aiming=false;
   camTarget.copy(player.pos);
   buildSquadHud();hudCache={};
   ['title','missions','over','win','pause'].forEach(id=>$(id).hidden=true);$('hud').hidden=false;
@@ -1829,7 +1829,7 @@ function updateHud(){
   let hold='';const rev=allies.find(a=>a.downed&&!a.dead&&a.revive>0);
   if(rev)hold=`LIFTING ${rev.name} ${'\u2588'.repeat(Math.ceil(rev.revive/2.4*8))}`;
   else if(stage===4&&consoleHold>0)hold=`CALLING LIFT ${'\u2588'.repeat(Math.ceil(consoleHold/10*10))}`;
-  else if(stage===1&&genHold>0)hold=`RESTARTING ${'\u2588'.repeat(Math.ceil(genHold/2.5*10))}`;
+  else if(stage<=1&&genHold>0)hold=`RESTARTING ${'\u2588'.repeat(Math.ceil(genHold/2.5*10))}`;
   setText('holdTxt',hold);
   setText('swapBtn',player.weapons.length>1?'SWAP':'\u2014');
 }
@@ -2173,7 +2173,7 @@ function update(dt){
 
   // ---- objectives
   const [ptx,pty]=tileAt(player.pos.x,player.pos.z);
-  if(stage===1&&genObj){
+  if(stage<=1&&genObj){
     const gd=Math.hypot(genObj.position.x-player.pos.x,genObj.position.z-player.pos.z);
     if(gd<2.6&&player.hp>0)genHold+=dt;else genHold=Math.max(0,genHold-dt);
     if(genHold>=2.5){genHold=0;setObjective(2);sfx.power();shake=0.3;genObj.userData.lamp.material.color.setHex(0xffc070);
