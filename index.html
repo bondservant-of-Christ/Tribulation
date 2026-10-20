@@ -117,6 +117,18 @@ blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-siz
 #dmgDir i{position:absolute;left:28%;right:28%;top:0;height:22px;border-top:5px solid var(--blood);border-radius:50% 50% 0 0;filter:drop-shadow(0 0 6px var(--blood))}
 body.noCursor #c{cursor:none}
 .sens{display:grid;gap:10px;max-width:420px}
+.uc{font-family:var(--mono);letter-spacing:.2em;color:var(--blood)!important;opacity:1!important;font-size:20px!important}
+.colStats{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:15px;letter-spacing:.12em;color:var(--brass)}
+.colStats b{color:var(--bone);font-weight:400}
+.colList{display:grid;gap:6px;max-width:560px}
+.colList details{background:rgba(19,11,11,.7);border:1px solid var(--rust);padding:8px 12px}
+.colList summary{cursor:pointer;font-family:var(--mono);font-size:15px;letter-spacing:.14em;color:var(--brass);list-style:none}
+.colList summary::-webkit-details-marker{display:none}
+.colList summary::before{content:'\25B8 ';color:var(--blood)}
+.colList details[open] summary::before{content:'\25BE '}
+.colList p{margin:6px 0 0;font-family:var(--scripture);font-size:17px;line-height:1.35;color:var(--bone)}
+.colList cite{display:block;font-style:normal;font-family:var(--mono);font-size:13px;color:var(--blood);margin-top:4px}
+.colList .lock{border:1px dashed rgba(122,26,20,.5);padding:8px 12px;font-family:var(--mono);font-size:14px;letter-spacing:.14em;opacity:.45}
 .setp{margin:0;max-width:460px;font-size:17px;line-height:1.35;color:var(--bone);opacity:.8}
 #setMsg{color:var(--brass);opacity:1;min-height:1em}
 .ghost.danger{border-color:var(--blood);color:var(--blood)}
@@ -206,7 +218,7 @@ body.noCursor #c{cursor:none}
     <div class="eyebrow">THE HORSEMEN · NORWAY, 2077</div>
     <h1>Tribu&shy;lation</h1>
     <blockquote>Eleven days ago the drill at Site 9 stopped. Three days ago the mine stopped answering. Tonight the stars over the ridge started going out.</blockquote>
-    <div class="row"><button class="cta" id="toMissions">MISSIONS</button><button class="ghost" id="toSettings">SETTINGS</button></div>
+    <div class="row"><button class="cta" id="toMissions">MISSIONS</button><button class="ghost" id="toLoadout">LOADOUT</button><button class="ghost" id="toCollection">COLLECTION</button><button class="ghost" id="toSettings">SETTINGS</button></div>
     <div class="controls">
       <span>Left thumb: move · Drag the right side: look · Tap the hand to search and read</span>
       <span>Hold AIM to raise. Sidearms fire when you let go, and a steady hold hits harder. Automatics fire while held.</span>
@@ -234,6 +246,27 @@ body.noCursor #c{cursor:none}
   </div>
 </div>
 
+<div class="overlay" id="loadout" hidden>
+  <div class="panel">
+    <div class="eyebrow">HORSEMEN · QUARTERMASTER</div>
+    <h2>Loadout</h2>
+    <p class="setp uc">UNDER CONSTRUCTION</p>
+    <p class="setp">The quartermaster's cage is still locked. Check back after the next deployment.</p>
+    <button class="ghost" id="loBack">BACK</button>
+  </div>
+</div>
+
+<div class="overlay" id="collection" hidden>
+  <div class="panel">
+    <div class="eyebrow">RECOVERED FROM THE FIELD</div>
+    <h2>Collection</h2>
+    <div class="colStats" id="colStats"></div>
+    <div class="lbl">LOGS</div>
+    <div class="colList" id="colList"></div>
+    <button class="ghost" id="colBack">BACK</button>
+  </div>
+</div>
+
 <div class="overlay" id="settings" hidden>
   <div class="panel">
     <div class="eyebrow">NORDKAPP COMMAND · RECORDS</div>
@@ -242,7 +275,7 @@ body.noCursor #c{cursor:none}
     <p class="setp">If a new scene or fix isn't showing up, refresh the game. Your saves are kept.</p>
     <button class="ghost" id="updBtn">REFRESH GAME</button>
     <div class="lbl">SAVED DATA</div>
-    <p class="setp">Wipes found weapons, the eye, one-time dialogue and look sensitivity. The game starts over as if new. This can't be undone.</p>
+    <p class="setp">Wipes found weapons, logs, kroner, the eye, one-time dialogue and look sensitivity. The game starts over as if new. This can't be undone.</p>
     <button class="ghost danger" id="resetBtn">RESET ALL DATA</button>
     <p class="setp" id="setMsg"></p>
     <button class="ghost" id="setBack">BACK</button>
@@ -617,12 +650,6 @@ function buildGrid(){
     ['a',20,9],['h',19,8],['n',19,10,4],
     ['W',14,3],['W',25,4],
     ['E',19.5,5.6]
-  ];
-  FURN=[
-    ['cabinet',2,8],['cabinet',3,8,'Personnel files. Forty-one names. Every one stamped \u201cACK\u201d in red.'],['desk',7,12],
-    ['desk',5,21,'A drilling report. \u201cDEPTH 6600. STOP.\u201d The word STOP is underlined three times.'],['cabinet',9,16],
-    ['desk',17,12],['locker',23,24],['locker',22,24],['crate',17,27],
-    ['locker',28,16],['crate',36,23],['crate',13,2,'Survey charges. Unused. Someone wrote \u201cnot down there\u201d on the lid.']
   ];
   fixtures=[
     [11,32,0xffb070,1],[27,41,0xffb070,1],[31,34,0xffc070,2],
@@ -1679,52 +1706,181 @@ function addNote(idx,x,z){
   scene.add(g);notes.push({g,scr,idx,x,z});
 }
 
-// ---------- searchable furniture ----------
-let containers=[],noteOpen=null,useTarget=null;
+// ---------- furniture: searchable containers and set dressing ----------
+// Rule the player can learn: anything CLOSED can be searched. Anything already standing open has been picked clean.
+let containers=[],solids=[],furnBatch=null,noteOpen=null,useTarget=null;
+let cash=0,stashes=[],notesFound=[];
+try{cash=+localStorage.getItem('tribulation.cash')||0;stashes=JSON.parse(localStorage.getItem('tribulation.stashes')||'[]');notesFound=JSON.parse(localStorage.getItem('tribulation.notes')||'[]');}catch(e){}
+function saveProg(){try{localStorage.setItem('tribulation.cash',String(cash));localStorage.setItem('tribulation.stashes',JSON.stringify(stashes));localStorage.setItem('tribulation.notes',JSON.stringify(notesFound));}catch(e){}}
+let _sd=1;const srnd=()=>{_sd=(_sd*16807)%2147483647;return (_sd-1)/2147483646;};
 const FMAT={};
 function fmat(){if(FMAT.metal)return FMAT;
-  FMAT.metal=new THREE.MeshPhongMaterial({color:0x3a3d40,flatShading:true,shininess:18,specular:0x222222});
-  FMAT.dark=new THREE.MeshPhongMaterial({color:0x1b1c1e,flatShading:true,shininess:6});
-  FMAT.wood=new THREE.MeshPhongMaterial({color:0x3e3226,flatShading:true,shininess:6});
-  FMAT.crate=new THREE.MeshPhongMaterial({map:texCrate,shininess:4});
-  FMAT.olive=new THREE.MeshPhongMaterial({color:0x2e3328,flatShading:true,shininess:8});
-  FMAT.handle=L(0x8d8f90);FMAT.red=L(0x7a1a14);return FMAT;}
+  const P=(c,o)=>new THREE.MeshPhongMaterial(Object.assign({color:c,flatShading:true,shininess:6},o||{}));
+  Object.assign(FMAT,{metal:P(0x3a3d40,{shininess:18,specular:0x222222}),dark:P(0x1b1c1e),wood:P(0x3e3226),wood2:P(0x2a2119),crate:new THREE.MeshPhongMaterial({map:texCrate,shininess:4}),
+    olive:P(0x2e3328,{shininess:8}),white:P(0x9c978e),handle:P(0x8d8f90,{shininess:30}),red:L(0x7a1a14),cork:P(0x4a3826),paper:P(0xbdb6a6),drum:P(0x4a2420),vend:P(0x3a1412),
+    book:[P(0x3a1a14),P(0x1e2a22),P(0x2a2620),P(0x4a3a22),P(0x1a1e2a),P(0x52483a)],box:[P(0x5a4a32),P(0x6a665c),P(0x2e3328),P(0x3a3226)],glass:new THREE.MeshPhongMaterial({color:0x5a6a70,transparent:true,opacity:0.45,shininess:60})});
+  return FMAT;}
+// open-topped box: bottom + four walls, so you can see what is inside
+function hollow(g,m,w,h,d,y0,front=true){mk(box(w,0.02,d),m,0,y0+0.01,0,g);for(const sd of[-1,1])mk(box(0.02,h,d),m,sd*(w/2-0.01),y0+h/2,0,g);mk(box(w,h,0.02),m,0,y0+h/2,-(d/2-0.01),g);if(front)mk(box(w,h,0.02),m,0,y0+h/2,d/2-0.01,g);}
 const CONT={
-  desk:{h:0.8,r:0.62,build(g,M){mk(box(1.3,0.05,0.66),M.wood,0,0.76,0,g);mk(box(0.42,0.72,0.6),M.dark,-0.42,0.36,0,g);mk(box(0.05,0.72,0.6),M.dark,0.6,0.36,0,g);mk(box(1.2,0.4,0.03),M.dark,0,0.5,-0.3,g);
+  desk:{d:0.66,h:0.8,cols:[[-0.35,0,0.42],[0.35,0,0.42]],lbl:'SEARCH',build(g,M){
+      mk(box(1.3,0.05,0.66),M.wood,0,0.76,0,g);for(const x of[-0.62,-0.22])mk(box(0.02,0.72,0.6),M.dark,x,0.36,0,g);mk(box(0.42,0.72,0.02),M.dark,-0.42,0.36,-0.29,g);
+      mk(box(0.05,0.72,0.6),M.dark,0.6,0.36,0,g);mk(box(1.2,0.4,0.03),M.dark,0,0.5,-0.3,g);mk(box(0.4,0.42,0.02),M.metal,-0.42,0.23,0.3,g);mk(box(0.14,0.025,0.03),M.handle,-0.42,0.36,0.32,g);
       mk(box(0.34,0.24,0.05),M.dark,0.25,0.92,-0.15,g).rotation.x=-0.15;mk(box(0.3,0.19,0.01),BASIC(0x0b0d0c),0.25,0.925,-0.12,g).rotation.x=-0.15;
-      const d=new THREE.Group();d.position.set(-0.42,0.58,0.02);g.add(d);mk(box(0.38,0.18,0.56),M.metal,0,0,0,d);mk(box(0.14,0.025,0.03),M.handle,0,0,0.29,d);
-      mk(box(0.38,0.18,0.02),M.metal,-0.42,0.34,0.3,g);mk(box(0.14,0.025,0.03),M.handle,-0.42,0.34,0.32,g);
-      return k=>{d.position.z=0.02+k*0.4;};}},
-  cabinet:{h:1.3,r:0.42,build(g,M){mk(box(0.5,1.24,0.58),M.metal,0,0.62,-0.02,g);
-      for(const y of[0.24,0.62])mk(box(0.46,0.34,0.02),M.metal,0,y,0.28,g),mk(box(0.14,0.025,0.03),M.handle,0,y+0.08,0.3,g);
-      const d=new THREE.Group();d.position.set(0,1.0,0);g.add(d);mk(box(0.46,0.34,0.56),M.metal,0,0,0,d);mk(box(0.14,0.025,0.03),M.handle,0,0.08,0.29,d);mk(box(0.1,0.05,0.005),BASIC(0xd8d0c0),0,-0.04,0.282,d);
-      return k=>{d.position.z=k*0.42;};}},
-  locker:{h:1.9,r:0.42,build(g,M){mk(box(0.6,1.9,0.03),M.olive,0,0.95,-0.24,g);for(const sd of[-1,1])mk(box(0.03,1.9,0.5),M.olive,sd*0.3,0.95,0,g);mk(box(0.6,0.03,0.5),M.olive,0,1.9,0,g);mk(box(0.6,0.03,0.5),M.olive,0,0.02,0,g);
-      mk(box(0.54,0.02,0.44),M.olive,0,1.55,0,g);
+      const d=new THREE.Group();d.position.set(-0.42,0.6,0.02);g.add(d);hollow(d,M.metal,0.38,0.15,0.54,-0.08,false);mk(box(0.4,0.18,0.02),M.metal,0,0,0.28,d);mk(box(0.14,0.025,0.03),M.handle,0,0.02,0.3,d);
+      return {anim:k=>{d.position.z=0.02+k*0.42;},slot:d,y:-0.07,sc:0.48,sx:0.15};}},
+  cabinet:{d:0.58,h:1.3,cols:[[0,0,0.36]],lbl:'SEARCH',build(g,M){
+      for(const sd of[-1,1])mk(box(0.02,1.24,0.58),M.metal,sd*0.24,0.62,0,g);mk(box(0.5,1.24,0.02),M.metal,0,0.62,-0.28,g);mk(box(0.5,0.02,0.58),M.metal,0,1.24,0,g);mk(box(0.5,0.04,0.58),M.metal,0,0.02,0,g);
+      for(const y of[0.24,0.62]){mk(box(0.46,0.34,0.02),M.metal,0,y,0.28,g);mk(box(0.14,0.025,0.03),M.handle,0,y+0.08,0.3,g);}
+      const d=new THREE.Group();d.position.set(0,1.0,0);g.add(d);hollow(d,M.metal,0.44,0.3,0.54,-0.16,false);mk(box(0.46,0.34,0.02),M.metal,0,0,0.28,d);mk(box(0.14,0.025,0.03),M.handle,0,0.08,0.3,d);mk(box(0.1,0.05,0.005),BASIC(0xd8d0c0),0,-0.04,0.292,d);
+      return {anim:k=>{d.position.z=k*0.44;},slot:d,y:-0.15,sc:0.6,sx:0.18};}},
+  locker:{d:0.5,h:1.9,cols:[[0,0,0.38]],lbl:'OPEN',build(g,M){
+      mk(box(0.6,1.9,0.03),M.olive,0,0.95,-0.24,g);for(const sd of[-1,1])mk(box(0.03,1.9,0.5),M.olive,sd*0.3,0.95,0,g);mk(box(0.6,0.03,0.5),M.olive,0,1.9,0,g);mk(box(0.6,0.03,0.5),M.olive,0,0.02,0,g);
+      mk(box(0.54,0.02,0.44),M.olive,0,1.55,0,g);mk(box(0.54,0.02,0.44),M.olive,0,0.95,0,g);mk(cyl(0.008,0.008,0.5,4),M.handle,0,1.45,0,g).rotation.z=Math.PI/2;
       const p=new THREE.Group();p.position.set(-0.3,0,0.25);g.add(p);mk(box(0.6,1.88,0.025),M.olive,0.3,0.95,0,p);for(let i=0;i<4;i++)mk(box(0.34,0.025,0.01),M.dark,0.3,1.62+i*0.05,0.015,p);mk(box(0.03,0.16,0.04),M.handle,0.54,1.0,0.02,p);
-      return k=>{p.rotation.y=-k*1.75;};}},
-  crate:{h:0.7,r:0.6,build(g,M){mk(box(0.95,0.6,0.62),M.crate,0,0.3,0,g);
+      return {anim:k=>{p.rotation.y=-k*1.75;},slot:g,y:0.97,sc:0.75,sx:0.2};}},
+  crate:{d:0.62,h:0.7,cols:[[0,0,0.52]],lbl:'OPEN',build(g,M){
+      hollow(g,M.crate,0.95,0.6,0.62,0);
       const p=new THREE.Group();p.position.set(0,0.6,-0.31);g.add(p);mk(box(0.99,0.06,0.66),M.crate,0,0.03,0.31,p);for(const sd of[-1,1])mk(box(0.06,0.04,0.66),M.dark,sd*0.36,0.08,0.31,p);
-      return k=>{p.rotation.x=-k*1.7;};}},
-  case:{h:0.75,r:0.62,build(g,M){mk(box(1.1,0.55,0.5),M.crate,0,0.275,0,g);mk(box(1.05,0.12,0.36),M.dark,0,0.61,0,g);
-      const p=new THREE.Group();p.position.set(0,0.67,-0.18);g.add(p);mk(box(1.05,0.1,0.36),M.dark,0,0.05,0.18,p);for(const sd of[-1,1])mk(box(0.06,0.05,0.04),M.handle,sd*0.4,0.04,0.37,p);mk(box(0.4,0.004,0.12),M.red,0,0.101,0.18,p);
-      return k=>{p.rotation.x=-k*1.9;};}}
+      return {anim:k=>{p.rotation.x=-k*1.7;},slot:g,y:0.03,sc:0.85,sx:0.3};}},
+  case:{d:0.5,h:0.75,cols:[[-0.3,0,0.32],[0.3,0,0.32]],lbl:'OPEN',rotItem:Math.PI/2,build(g,M){
+      hollow(g,M.crate,1.1,0.55,0.5,0);mk(box(1.04,0.02,0.44),M.dark,0,0.4,0,g);
+      const p=new THREE.Group();p.position.set(0,0.55,-0.25);g.add(p);mk(box(1.1,0.08,0.5),M.dark,0,0.04,0.25,p);for(const sd of[-1,1])mk(box(0.06,0.05,0.04),M.handle,sd*0.4,0.04,0.51,p);mk(box(0.4,0.004,0.12),M.red,0,0.082,0.25,p);
+      return {anim:k=>{p.rotation.x=-k*1.9;},slot:g,y:0.41,sc:0.85,sx:0.3};}},
+  safe:{d:0.6,h:0.75,cols:[[0,0,0.4]],lbl:'OPEN',build(g,M){
+      hollow(g,M.dark,0.62,0.62,0.56,0,false);mk(box(0.62,0.02,0.56),M.dark,0,0.61,0,g);
+      const p=new THREE.Group();p.position.set(-0.31,0,0.29);g.add(p);mk(box(0.62,0.62,0.05),M.metal,0.31,0.31,0,p);mk(cyl(0.06,0.06,0.03,10),M.handle,0.31,0.38,0.035,p).rotation.x=Math.PI/2;mk(box(0.04,0.14,0.03),M.handle,0.5,0.3,0.035,p);
+      return {anim:k=>{p.rotation.y=-k*1.8;},slot:g,y:0.03,sc:0.7,sx:0.2};}},
+  firstaid:{d:0.2,h:1.75,cols:[],lbl:'OPEN',build(g,M){
+      const b=new THREE.Group();b.position.y=1.05;g.add(b);hollow(b,M.white,0.5,0.6,0.18,0,false);mk(box(0.5,0.02,0.18),M.white,0,0.59,0,b);mk(box(0.46,0.02,0.16),M.white,0,0.3,0,b);
+      const p=new THREE.Group();p.position.set(-0.25,0,0.09);b.add(p);mk(box(0.5,0.6,0.02),M.white,0.25,0.3,0,p);mk(box(0.22,0.06,0.005),BASIC(0xb02a22),0.25,0.32,0.012,p);mk(box(0.06,0.22,0.005),BASIC(0xb02a22),0.25,0.32,0.012,p);
+      return {anim:k=>{p.rotation.y=-k*1.9;},slot:b,y:0.02,sc:0.55,sx:0.2};}}
 };
-const FLAVOR=['Empty.','Empty. Someone went through this already.','Paperwork. Shift rosters, all signed off at 09:01.','A photo of a family, turned face down.','Nothing useful. The papers are damp.','Empty, except for dust.','A crew badge. The name has been scratched off.'];
-function addContainer(type,items,x,z,flavor){
-  const [tx,ty]=tileAt(x,z),M=fmat(),T=CONT[type];
-  let cx=x,cz=z,rot=0;
-  if(type!=='crate'){const dirs=[[0,-1,0],[0,1,Math.PI],[-1,0,Math.PI/2],[1,0,-Math.PI/2]];
-    for(const [dx,dy,r] of dirs)if(cell(tx+dx,ty+dy)==='#'){cx=tw(tx)+dx*(S/2-T.r*0.8);cz=tw(ty)+dy*(S/2-T.r*0.8);rot=r;break;}}
-  else rot=rand(-0.4,0.4);
-  const g=new THREE.Group();g.position.set(cx,0,cz);g.rotation.y=rot;const anim=T.build(g,M);
-  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});scene.add(g);
-  const c={g,type,items:items.slice(),x:cx,z:cz,h:T.h,r:T.r,anim,open:0,opening:false,searched:false,flavor:flavor||FLAVOR[Math.floor(Math.random()*FLAVOR.length)]};
+const PROP={
+  chair(g,M,o){const s=new THREE.Group();g.add(s);mk(box(0.44,0.05,0.42),M.dark,0,0.46,0,s);mk(box(0.44,0.46,0.04),M.dark,0,0.72,-0.2,s);for(const[x,z]of[[-0.19,-0.18],[0.19,-0.18],[-0.19,0.18],[0.19,0.18]])mk(box(0.035,0.46,0.035),M.metal,x,0.23,z,s);
+    if(o.tip){s.rotation.x=-Math.PI/2;s.position.set(0,0.22,-0.46);}return [[0,0,0.28]];},
+  counter(g,M){mk(box(2.4,1.0,0.5),M.wood,0,0.5,0,g);mk(box(2.5,0.04,0.66),M.wood2,0,1.04,0.04,g);mk(box(2.3,0.04,0.42),M.dark,0,0.74,-0.44,g);mk(box(2.4,0.06,0.02),M.red,0,0.9,0.26,g);
+    mk(box(0.4,0.28,0.05),M.dark,0.5,1.22,-0.1,g).rotation.y=Math.PI;mk(box(0.06,0.14,0.06),M.dark,0.5,1.1,-0.12,g);mk(cyl(0.05,0.06,0.04,8),M.handle,-0.7,1.08,0.15,g);
+    for(let i=0;i<3;i++)mk(box(0.21,0.004,0.29),M.paper,-0.2+i*0.12,1.065+i*0.002,0.05,g).rotation.y=srnd()*0.8-0.4;return [[-0.85,0,0.42],[0,0,0.42],[0.85,0,0.42]];},
+  lowtable(g,M){mk(box(1.0,0.04,0.55),M.wood,0,0.42,0,g);for(const[x,z]of[[-0.45,-0.22],[0.45,-0.22],[-0.45,0.22],[0.45,0.22]])mk(box(0.04,0.4,0.04),M.metal,x,0.2,z,g);
+    for(let i=0;i<2;i++)mk(box(0.22,0.01,0.3),M.box[i],-0.2+i*0.3,0.445+i*0.01,0,g).rotation.y=srnd()-0.5;return [[0,0,0.48]];},
+  table(g,M){mk(box(1.4,0.04,0.8),M.wood,0,0.74,0,g);for(const[x,z]of[[-0.64,-0.34],[0.64,-0.34],[-0.64,0.34],[0.64,0.34]])mk(box(0.05,0.72,0.05),M.metal,x,0.36,z,g);return [[-0.4,0,0.45],[0.4,0,0.45]];},
+  bench(g,M){mk(box(1.8,0.06,0.42),M.wood,0,0.45,0,g);mk(box(1.8,0.36,0.04),M.wood,0,0.74,-0.2,g);for(const x of[-0.75,0.75])mk(box(0.06,0.45,0.38),M.metal,x,0.225,0,g);return [[-0.55,0,0.32],[0.55,0,0.32]];},
+  plant(g,M){mk(cyl(0.2,0.15,0.4,8),M.dark,0,0.2,0,g);mk(cyl(0.18,0.18,0.02,8),M.wood2,0,0.39,0,g);
+    for(let i=0;i<6;i++){const s=mk(box(0.02,0.5+srnd()*0.5,0.02),M.wood,(srnd()-0.5)*0.12,0.65,(srnd()-0.5)*0.12,g);s.rotation.set((srnd()-0.5)*0.9,0,(srnd()-0.5)*0.9);}return [[0,0,0.26]];},
+  cooler(g,M){mk(box(0.32,0.95,0.32),M.white,0,0.475,0,g);mk(cyl(0.14,0.14,0.42,10),M.glass,0,1.16,0,g);mk(box(0.06,0.04,0.04),M.handle,0,0.8,0.17,g);return [[0,0,0.26]];},
+  vending(g,M){mk(box(0.9,1.9,0.7),M.vend,0,0.95,0,g);mk(box(0.6,1.4,0.02),BASIC(0x120606),-0.1,1.1,0.36,g);
+    for(let r=0;r<4;r++)for(let c=0;c<3;c++)if(srnd()>0.35)mk(box(0.12,0.16,0.04),M.box[(r+c)%4],-0.3+c*0.2,0.55+r*0.33,0.33,g);
+    mk(box(0.18,0.5,0.02),M.metal,0.32,1.2,0.36,g);mk(box(0.03,0.03,0.01),BASIC(0xff3020),0.32,1.5,0.372,g);return [[0,0,0.52]];},
+  shelf(g,M){for(const x of[-0.88,0.88])for(const z of[-0.23,0.23])mk(box(0.04,2,0.04),M.metal,x,1,z,g);
+    for(const y of[0.1,0.62,1.14,1.66]){mk(box(1.8,0.03,0.5),M.metal,0,y,0,g);let x=-0.8;while(x<0.7){const w=0.2+srnd()*0.3;if(srnd()>0.3){const h=0.15+srnd()*0.28;mk(box(w-0.03,h,0.3+srnd()*0.12),M.box[(srnd()*4)|0],x+w/2,y+0.015+h/2,0,g).rotation.y=(srnd()-0.5)*0.2;}x+=w;}}
+    return [[-0.55,0,0.36],[0.55,0,0.36]];},
+  bookshelf(g,M){for(const sd of[-1,1])mk(box(0.03,2,0.34),M.wood2,sd*0.45,1,0,g);mk(box(0.93,0.03,0.34),M.wood2,0,1.99,0,g);mk(box(0.93,2,0.02),M.wood2,0,1,-0.16,g);
+    for(const y of[0.04,0.44,0.84,1.24,1.64]){mk(box(0.9,0.03,0.32),M.wood2,0,y,0,g);let x=-0.42;while(x<0.38){const w=0.03+srnd()*0.035;if(srnd()>0.12){const h=0.2+srnd()*0.1;mk(box(w-0.004,h,0.22),M.book[(srnd()*6)|0],x+w/2,y+0.015+h/2,0.02,g).rotation.z=srnd()>0.92?0.3:0;}else x+=0.05;x+=w;}}
+    return [[0,0,0.36]];},
+  board(g,M){mk(box(1.2,0.8,0.03),M.cork,0,1.5,0,g);mk(box(1.26,0.04,0.05),M.wood2,0,1.92,0,g);mk(box(1.26,0.04,0.05),M.wood2,0,1.08,0,g);
+    for(let i=0;i<6;i++)mk(box(0.18+srnd()*0.06,0.24,0.004),M.paper,-0.42+i*0.17+(srnd()-0.5)*0.05,1.5+(srnd()-0.5)*0.3,0.02,g).rotation.z=(srnd()-0.5)*0.25;return [];},
+  papers(g,M,o){for(let i=0;i<(o.n||5);i++){const a=srnd()*TAU,r=srnd()*(o.spread||1.1);mk(box(0.21,0.004,0.29),M.paper,Math.cos(a)*r,0.004+i*0.0012,Math.sin(a)*r,g).rotation.y=srnd()*TAU;}return [];},
+  drums(g,M){const pts=[[-0.33,0],[0.33,0.05],[0,-0.5]];for(const[x,z]of pts){mk(cyl(0.29,0.29,0.88,10),M.drum,x,0.44,z,g);mk(cyl(0.3,0.3,0.03,10),M.dark,x,0.62,z,g);}return [[0,-0.15,0.72]];},
+  bin(g,M){mk(cyl(0.2,0.17,0.55,8),M.metal,0,0.275,0,g);if(srnd()>0.4)mk(box(0.21,0.004,0.29),M.paper,0.25,0.004,0.1,g).rotation.y=srnd()*3;return [[0,0,0.22]];},
+  rug(g,M,o){mk(box(o.w2||2.4,0.006,o.d2||1.6),M.red,0,0.004,0,g);mk(box((o.w2||2.4)-0.2,0.007,(o.d2||1.6)-0.2),M.wood2,0,0.005,0,g);return [];},
+  pallet(g,M){mk(box(1.2,0.12,1.0),M.wood,0,0.06,0,g);mk(box(0.95,0.6,0.62),M.crate,0,0.42,0,g);const t=mk(box(0.8,0.5,0.55),M.crate,0.05,0.97,0.02,g);t.rotation.y=0.3;return [[0,0,0.72]];}
+};
+const WALLD={N:[0,-1,0],S:[0,1,Math.PI],W:[-1,0,Math.PI/2],E:[1,0,-Math.PI/2]};
+function placeAt(tx,ty,o,d){let x=tw(tx),z=tw(ty),rot=o.rot||0;
+  if(o.w){const D=WALLD[o.w],off=S/2-d/2-0.03-(o.out||0);x+=D[0]*off;z+=D[1]*off;rot=D[2];const a=o.ox||0;if(o.w==='N'||o.w==='S')x+=a;else z+=a;if(o.face==='in')rot+=Math.PI;}
+  else{x+=o.ox||0;z+=o.oz||0;}
+  return [x,z,rot];}
+function addSolids(cols,x,z,rot){const c=Math.cos(rot),s=Math.sin(rot);for(const[lx,lz,r] of cols)solids.push({x:x+lx*c+lz*s,z:z-lx*s+lz*c,r});}
+const _batch=[];
+function staticMeshes(g,deep){const out=[];(deep?g.traverse.bind(g):fn=>g.children.forEach(fn))(o=>{if(o.isMesh)out.push(o);});return out;}
+function itemMesh(kind){const g=new THREE.Group();
+  if(kind==='C'){const band=BASIC(0xc9a24a),note=L(0x56604a);for(let i=0;i<3;i++){const b=mk(box(0.18,0.04,0.09),note,(i-1)*0.06,-0.1+i*0.04,(i%2)*0.03,g);b.rotation.y=(i-1)*0.3;mk(box(0.04,0.045,0.095),band,(i-1)*0.06,-0.1+i*0.04,(i%2)*0.03,g).rotation.y=(i-1)*0.3;}}
+  else PICK[kind].make(g);return g;}
+function fillSlot(c){const T=c.T,n=c.items.length;c.meshes.forEach(m=>c.slot.remove(m));c.meshes=[];
+  c.items.forEach((it,i)=>{const m=itemMesh(it);m.scale.setScalar(c.sc);m.position.set((i-(n-1)/2)*c.sx,c.y+0.13*c.sc,0);if(T.rotItem)m.rotation.y=T.rotItem;c.slot.add(m);c.meshes.push(m);});}
+function addContainer(type,tx,ty,o={}){
+  const T=CONT[type],M=fmat(),[x,z,rot]=placeAt(tx,ty,o,T.d);
+  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;const B=T.build(g,M);scene.add(g);g.updateMatrixWorld(true);
+  _batch.push(...staticMeshes(g,false));addSolids(T.cols,x,z,rot);
+  const items=(o.items||[]).slice();let cashId=null,cashAmt=0;
+  if(o.cash&&!stashes.includes(o.cash[0])){items.push('C');cashId=o.cash[0];cashAmt=o.cash[1];}
+  const c={g,T,type,items,cashId,cashAmt,x,z,h:T.h,anim:B.anim,slot:B.slot,y:B.y,sc:B.sc,sx:B.sx,meshes:[],open:0,opening:false,searched:false,
+    flavor:o.fl||(items.length?'':'Empty.')};
+  fillSlot(c);
+  if(o.open){c.open=1;c.anim(1);c.searched=true;}
   containers.push(c);return c;
 }
-function giveItem(c){
+function addProp(type,tx,ty,o={}){
+  const M=fmat(),dep=({counter:0.5,bench:0.42,bookshelf:0.34,shelf:0.5,vending:0.7,board:0.03,cooler:0.32,plant:0.4,chair:0.45})[type]||0.5,[x,z,rot]=placeAt(tx,ty,o,dep);
+  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;const cols=PROP[type](g,M,o);scene.add(g);g.updateMatrixWorld(true);
+  _batch.push(...staticMeshes(g,true));addSolids(cols,x,z,rot);containers.push({prop:true,g,searched:true,x,z});
+}
+// bake every static piece of furniture into a handful of draw calls
+function bakeFurniture(){
+  const by=new Map();
+  for(const m of _batch){m.updateWorldMatrix(true,false);const gg=(m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone());gg.applyMatrix4(m.matrixWorld);
+    if(!by.has(m.material))by.set(m.material,[]);by.get(m.material).push(gg);m.parent.remove(m);}
+  _batch.length=0;furnBatch=new THREE.Group();
+  for(const [mat,list] of by){let n=0;for(const gg of list)n+=gg.attributes.position.count;const hasUV=list.every(gg=>gg.attributes.uv);
+    const pos=new Float32Array(n*3),nor=new Float32Array(n*3),uv=hasUV?new Float32Array(n*2):null;let o=0;
+    for(const gg of list){pos.set(gg.attributes.position.array,o*3);nor.set(gg.attributes.normal.array,o*3);if(uv)uv.set(gg.attributes.uv.array,o*2);o+=gg.attributes.position.count;gg.dispose();}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.BufferAttribute(nor,3));if(uv)geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+    const mesh=new THREE.Mesh(geo,mat);mesh.castShadow=!mat.transparent;mesh.receiveShadow=true;furnBatch.add(mesh);}
+  scene.add(furnBatch);
+}
+// ---- the plan: what each room is, and what is in it
+function buildFurniture(){
+  _sd=4077;const C=addContainer,P=addProp,PI=Math.PI;
+  const S_=armory.includes('jericho')?'s':'S',F_=armory.includes('thunders')?'r':'F';
+  // YARD — a supply drop by the west trees, fuel and spares by the generator shed
+  P('pallet',12,40,{rot:0.2});C('crate',13,41,{open:1,rot:-0.3});C('crate',8,43,{rot:0.25,items:['a']});P('papers',13,40,{n:3,spread:1.6});
+  P('drums',30,36,{rot:0.4});C('crate',32,31,{rot:-0.2,items:['h']});C('crate',28,31,{rot:0.1,cash:['yard',120],fl:'Spare filters and a crowbar.'});P('pallet',26,37,{rot:-0.1});C('crate',27,38,{open:1,rot:0.6});
+  // RECEPTION (receiving bay) — front counter to the east, a waiting area to the west
+  P('counter',21.5,25,{rot:0});C('desk',22,24,{w:'N',items:['a']});P('chair',22,24,{w:'N',out:0.8,face:'in'});C('cabinet',23,24,{w:'N',ox:0.75,open:1});C('cabinet',21,24,{w:'N',ox:-0.4,open:1});
+  C('firstaid',23,27,{w:'E',items:['h']});
+  for(const[ty,a]of[[25,-0.55],[25,0.15],[26,-0.35],[26,0.35]])P('chair',16,ty,{w:'W',ox:a});P('chair',18,27.3,{rot:2.2,tip:1});P('lowtable',17,25.6,{rot:PI/2});
+  P('plant',16,24,{w:'N',ox:-0.75});P('chair',17.4,27.4,{rot:-PI/2});P('chair',17.4,28.1,{rot:-PI/2});P('bench',22,28,{w:'S',ox:0.3});P('bench',17,28,{w:'S',ox:0.6});P('plant',23,28,{w:'S',ox:0.8});P('bin',18,24,{w:'N',ox:0.6});P('rug',17,25.6,{w2:2.2,d2:3});P('cooler',16,28,{w:'S',ox:-0.75});P('board',16,27,{w:'W'});P('papers',21,26.4,{n:7});P('papers',18,24.4,{n:2});
+  // SOUTH CORRIDOR
+  P('bench',19,20,{w:'W'});P('plant',20,22,{w:'E',ox:0.6});P('papers',20,18.5,{n:3});
+  // ATRIUM — security checkpoint by the red door, staff lockers on the east wall
+  C('desk',22,12,{w:'N',items:['a']});P('chair',22,12,{w:'N',out:0.8,face:'in'});P('board',23,12,{w:'N',ox:0.3});
+  C('locker',25,12,{w:'E',ox:0.2,open:1});C('locker',25,13,{w:'E',ox:-0.5,open:1});C('locker',25,13,{w:'E',ox:0.2,fl:'A guard’s jacket on its hanger. The radio in the pocket is still on, hissing.'});C('locker',25,15,{w:'E',open:1});
+  P('vending',14,15,{w:'W'});P('vending',14,14,{w:'W',ox:-0.6});P('bin',14,13,{w:'W',ox:0.4});P('table',16.4,12.9,{rot:0});P('chair',16.4,12.9,{ox:-0.45,oz:0.7,rot:PI});P('chair',16.4,12.9,{ox:0.5,oz:-0.65,rot:0.3});P('table',23.5,15.3,{rot:0.1});P('chair',23.5,15.3,{oz:-0.75});P('chair',23.5,15.3,{ox:0.7,oz:0.5,tip:1,rot:2.4});P('plant',14,16,{w:'S',ox:-0.75});P('bench',17,16,{w:'S'});P('bench',22,16,{w:'S'});P('papers',20.5,13.5,{n:4});
+  // RECORDS — a wall of filing cabinets, ransacked
+  for(const tx of[2,3,4,5,6,7])for(const a of[-0.4,0.35]){const k=tx+':'+a;
+    if(k==='4:-0.4')C('cabinet',tx,8,{w:'N',ox:a,items:['a']});
+    else if(k==='6:0.35')C('cabinet',tx,8,{w:'N',ox:a,fl:'Personnel files. Forty-one names. Every one stamped “ACK” in red.'});
+    else C('cabinet',tx,8,{w:'N',ox:a,open:1});}
+  C('desk',4,10,{ox:-0.3,oz:0.2,open:1});P('chair',4,10,{ox:-0.3,oz:0.95,rot:PI});C('desk',6,10,{ox:0.2,oz:0.2,fl:'Maintenance tickets. A whole stack, every one marked NO FAULT FOUND.'});P('chair',7,10.6,{rot:1.2,tip:1});
+  P('bookshelf',2,10,{w:'W'});P('bookshelf',2,11,{w:'W',ox:0.3});P('shelf',9,10,{w:'E'});P('shelf',9,11,{w:'E',ox:0.3});C('cabinet',8,12,{w:'S',open:1});C('cabinet',7,12,{w:'S',ox:0.5,open:1});P('bin',5,12,{w:'S'});C('firstaid',3,12,{w:'S',items:['h']});P('papers',5,9.2,{n:10,spread:1.6});P('papers',7,11.4,{n:6});
+  // DIRECTOR'S OFFICE — big desk facing the door, the safe in the corner
+  C('desk',4,19,{rot:0,items:['k']});P('chair',4,19,{oz:0.85,rot:PI});P('chair',4,19,{ox:-0.45,oz:-1.0});P('chair',4,19,{ox:0.45,oz:-1.0});
+  P('bookshelf',2,17,{w:'W',ox:-0.4});P('bookshelf',2,18,{w:'W',ox:0.2});C('cabinet',2,16,{w:'N',ox:0.2,items:['a']});
+  C('safe',9,21,{w:'S',ox:0.5,cash:['director',500],fl:'A passport and a set of car keys. He meant to leave.'});P('plant',9,16,{w:'N',ox:0.75});P('rug',4,18.6,{w2:3,d2:2.6});P('bookshelf',2,19,{w:'W'});P('table',7.2,20,{rot:PI/2});P('chair',7.2,20,{ox:-0.7,rot:PI/2});P('chair',7.2,20,{ox:0.7,rot:-PI/2});P('papers',6,19.5,{n:3});
+  // RAM'S HORN CLOSET — someone's private stash
+  C('case',12,19,{w:'E',items:[S_]});C('crate',11,18,{w:'N',items:['s']});C('crate',12,18,{w:'N',ox:0.2,items:['s']});
+  // EAST CORRIDOR — dead end
+  C('crate',37,14,{w:'E',items:['s']});
+  // STORAGE — lockers, racks, crates
+  C('locker',32,16,{w:'N',ox:-0.35,open:1});C('locker',32,16,{w:'N',ox:0.35,open:1});C('locker',33,16,{w:'N',ox:-0.35,fl:'A hard hat. The lining has been torn out of it.'});C('locker',33,16,{w:'N',ox:0.35,open:1});C('locker',34,16,{w:'N',open:1});
+  C('locker',36,16,{w:'N',items:['b']});
+  for(const ty of[19,20,21])P('shelf',37,ty,{w:'E'});for(const ty of[19,20])P('shelf',28,ty,{w:'W'});P('pallet',33,17,{rot:0.2});P('pallet',30,18.6,{rot:-0.3});
+  C('crate',29,21,{rot:0.15,items:['a']});C('crate',37,22,{w:'E',items:['r']});C('crate',36,23,{w:'S',ox:-0.3,cash:['storage',200]});
+  C('crate',31,20,{open:1,rot:0.4});C('crate',34,22,{open:1,rot:-0.3});C('firstaid',33,23,{w:'S',items:['h']});P('pallet',28,23,{rot:0.1});P('drums',32,22,{rot:1});
+  // THUNDERHEAD CLOSET
+  C('case',33,9,{w:'N',items:[F_]});C('crate',31,9,{w:'W',items:['r']});C('crate',34,12,{w:'E',items:['r']});P('shelf',34,10,{w:'E'});
+  // RED HALL — guard post at the shaft door
+  C('desk',20,9,{w:'E',items:['a']});P('chair',20,9,{w:'E',out:0.8,face:'in'});C('firstaid',19,8,{w:'W',items:['h']});C('locker',20,7,{w:'E',open:1});
+  // SHAFT HEAD — tool lockers, survey charges, drums
+  C('locker',23,1,{w:'N',ox:-0.35,open:1});C('locker',23,1,{w:'N',ox:0.35,cash:['shaft',150],fl:'A rope, a lamp, a crucifix on a nail.'});C('locker',24,1,{w:'N',open:1});
+  C('crate',13,2,{w:'W',fl:'Survey charges. Unused. Someone wrote “not down there” on the lid.'});P('pallet',26,5,{rot:0.3});P('drums',13,5,{});P('shelf',16,1,{w:'N'});
+  bakeFurniture();
+}
+function giveItem(c,ct){
   if(c==='a'){player.ammo.p+=8;return PICK.a.label;}if(c==='s'){player.ammo.s+=4;return PICK.s.label;}if(c==='r'){player.ammo.r+=30;return PICK.r.label;}
   if(c==='h'){if(player.hp>=player.max)return null;player.hp=Math.min(player.max,player.hp+30);return PICK.h.label;}
+  if(c==='C'){cash+=ct.cashAmt;if(!stashes.includes(ct.cashId))stashes.push(ct.cashId);saveProg();return ct.cashAmt+' KR';}
   if(c==='k'){player.keys.k=true;setObjective(3);radio(['CMDR. VALE','You have the shaft key. The lift is north, past the red door. Bring the crew up if they’re down there.']);return PICK.k.label;}
   if(c==='b'){player.keys.b=true;return 'BLUE KEYCARD · SOMETHING ELSE IS LOCKED IN HERE';}
   if(c==='S'||c==='F'){const id=c==='S'?'jericho':'thunders';player.weapons.push(id);player.mags[id]=WEAP[id].mag;player.ammo[WEAP[id].ammo]+=id==='jericho'?8:60;
@@ -1732,29 +1888,30 @@ function giveItem(c){
   return null;
 }
 function searchContainer(c){
-  if(!c.opening&&c.open<1){c.opening=true;
-    if(c.type==='locker')noise(0.45,320,5,0.08);else if(c.type==='crate'||c.type==='case')noise(0.3,180,1.2,0.12);else{noise(0.28,700,1.4,0.1);noise(0.04,2400,3,0.06,0.26);}
+  if(c.open<1){if(c.opening)return;c.opening=true;
+    if(c.type==='locker'||c.type==='firstaid')noise(0.45,320,5,0.08);else if(c.type==='safe'){noise(0.06,1800,4,0.08);noise(0.5,140,2,0.1,0.08);}else if(c.type==='crate'||c.type==='case')noise(0.3,180,1.2,0.12);else{noise(0.28,700,1.4,0.1);noise(0.04,2400,3,0.06,0.26);}
     return;}
+  // second interaction: take what you can see
   const got=[],kept=[];
-  for(const it of c.items){const m=giveItem(it);if(m===null)kept.push(it);else if(m)got.push(m);}
+  for(const it of c.items){const m=giveItem(it,c);if(m===null)kept.push(it);else if(m)got.push(m);}
   if(got.length){sfx.pickup();toast('+ '+got.join(' · + '));}
   else if(kept.length)toast('FIELD DRESSING · YOU’RE NOT HURT. LEAVE IT FOR NOW.');
-  else if(!c.items.length)toast(c.flavor);
-  c.items=kept;c.searched=!kept.length;
+  c.items=kept;fillSlot(c);if(!kept.length){c.searched=true;if(c.flavor&&got.length)events.push({t:2.6,fn:()=>toast(c.flavor)});}
 }
-function openNote(n){noteOpen=n;const N=NOTES[n.idx];$('noteTitle').textContent=N.t;$('noteText').innerHTML=`${N.b}<cite>— ${N.c}</cite>`;$('note').hidden=false;sfx.radio();}
+function containerOpened(c){if(!c.items.length){c.searched=true;toast(c.flavor||'Empty.');}}
+function openNote(n){noteOpen=n;const N=NOTES[n.idx];$('noteTitle').textContent=N.t;$('noteText').innerHTML=`${N.b}<cite>— ${N.c}</cite>`;$('note').hidden=false;sfx.radio();
+  if(!notesFound.includes(n.idx)){notesFound.push(n.idx);saveProg();}}
 function closeNote(){noteOpen=null;$('note').hidden=true;}
 function interact(){if(state!=='play'||!useTarget||player.hp<=0)return;
   if(useTarget.note){if(noteOpen===useTarget.note)closeNote();else openNote(useTarget.note);}
   else searchContainer(useTarget.c);}
 const _uv=new THREE.Vector3();
 function updateInteract(dt){
-  // furniture is solid to the player
-  for(const c of containers){const dx=player.pos.x-c.x,dz=player.pos.z-c.z,d=Math.hypot(dx,dz),m=c.r+0.28;if(d<m&&d>0.001){player.pos.x=c.x+dx/d*m;player.pos.z=c.z+dz/d*m;}
-    if(c.opening){c.open=Math.min(1,c.open+dt*3);c.anim(ss(c.open));if(c.open>=1){c.opening=false;searchContainer(c);}}}
+  for(const s of solids){const dx=player.pos.x-s.x,dz=player.pos.z-s.z,d=Math.hypot(dx,dz),m=s.r+0.28;if(d<m&&d>0.001){player.pos.x=s.x+dx/d*m;player.pos.z=s.z+dz/d*m;}}
+  for(const c of containers)if(c.opening){c.open=Math.min(1,c.open+dt*3);c.anim(ss(c.open));if(c.open>=1){c.opening=false;containerOpened(c);}}
   const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);let best=null,bs=1e9;
   const consider=(x,z,y,o)=>{const dx=x-player.pos.x,dz=z-player.pos.z,d=Math.hypot(dx,dz);if(d>2.1)return;const dot=d<0.6?1:(dx*fx+dz*fz)/d;if(dot<0.45)return;const sc=d-dot;if(sc<bs){bs=sc;best=Object.assign({x,z,y},o);}};
-  for(const c of containers)if(!c.searched&&!c.opening)consider(c.x,c.z,c.h+0.15,{c,lbl:c.open>=1?'TAKE':c.type==='locker'||c.type==='crate'||c.type==='case'?'OPEN':'SEARCH'});
+  for(const c of containers)if(!c.prop&&!c.searched&&!c.opening)consider(c.x,c.z,c.h+0.15,{c,lbl:c.open>=1?'TAKE':c.T.lbl});
   for(const n of notes)consider(n.x,n.z,1.1,{note:n,lbl:noteOpen===n?'CLOSE':'READ'});
   useTarget=player.hp>0&&state==='play'?best:null;
   const b=$('useBtn');
@@ -1767,7 +1924,7 @@ function updateInteract(dt){
   if(noteOpen&&(noteOpen.x-player.pos.x)**2+(noteOpen.z-player.pos.z)**2>9)closeNote();
 }
 function clearWorld(){
-  containers.forEach(c=>scene.remove(c.g));containers=[];closeNote();useTarget=null;
+  containers.forEach(c=>scene.remove(c.g));containers=[];solids=[];if(furnBatch){scene.remove(furnBatch);furnBatch.traverse(o=>{if(o.isMesh)o.geometry.dispose();});furnBatch=null;}closeNote();useTarget=null;
   [player,...allies].forEach(e=>e&&scene.remove(e.obj));
   [...enemies.map(e=>e.obj),...bullets.map(b=>b.m),...orbs.map(o=>o.m),...pickups.map(p=>p.m),...pickups.filter(p=>p.glow).map(p=>p.glow),...parts.map(p=>p.m),...notes.map(n=>n.g)].forEach(o=>scene.remove(o));
   if(consoleObj)scene.remove(consoleObj);if(genObj)scene.remove(genObj);genObj=null;
@@ -1779,7 +1936,7 @@ function startMission(){
   clearWorld();buildGrid();buildLevel();
   player=makePlayer();
   allies=ALLY_DEF.map(makeAlly);
-  FURN.forEach(([ty,x,y,fl])=>addContainer(ty,[],tw(x),tw(y),fl));
+  buildFurniture();
   ents.forEach(([c,x,y,n])=>{
     const wx=tw(x),wz=tw(y);
     if(c==='P'){player.pos.set(wx,0,wz);player.obj.rotation.y=Math.PI;allies.forEach((a,i)=>{a.pos.set(wx+(i-1)*1.2,0,wz+1.6);a.obj.rotation.y=Math.PI;});}
@@ -1790,9 +1947,7 @@ function startMission(){
     else if(c==='g'){genObj=new THREE.Group();genObj.position.set(wx,0,wz);mk(box(2,1.4,1.6),L(0x4a5a3a),0,0.7,0,genObj);mk(cyl(0.12,0.12,1.2,6),L(0x2a2a28),0.7,1.9,-0.5,genObj);
       const lamp=mk(box(0.2,0.2,0.2),BASIC(0x5a1a10),-0.7,1.5,0.8,genObj);genObj.userData.lamp=lamp;mk(box(1.2,0.5,0.1),L(0x2e3a28),0,0.9,0.82,genObj);scene.add(genObj);}
     else if(c==='E'){consoleObj=new THREE.Group();consoleObj.position.set(wx,0,wz);mk(box(1.4,1,0.7),L(0x3a3e3c),0,0.5,0,consoleObj);consoleScr=mk(box(1.1,0.4,0.06),BASIC(0x7a0c08),0,1.15,-0.1,consoleObj);consoleScr.rotation.x=-0.6;scene.add(consoleObj);}
-    else if(c==='S'){addContainer('case',armory.includes('jericho')?['s']:['S'],wx,wz,'');}
-    else if(c==='F'){addContainer('case',armory.includes('thunders')?['r']:['F'],wx,wz,'');}
-    else if('ahsrkb'.includes(c)){const yard=cell(x|0,y|0)===',';addContainer(yard?'crate':c==='k'?'desk':c==='b'?'locker':c==='h'?'cabinet':['desk','cabinet','locker','crate'][(x*7+y*3|0)%4],[c],wx,wz);}
+    else if('SFahsrkb'.includes(c)){} // placed by the furniture plan
     else addPickup(c,wx,wz);
   });
   laser=new THREE.Mesh(box(0.025,0.025,1),BASIC(0xff2a1a,{transparent:true,opacity:.7}));laser.visible=false;scene.add(laser);
@@ -1921,7 +2076,7 @@ function hitscan(muzzleP,fwd,spread,range,dmg,breaker){
   else if(kind!=='none')spark3(end);
   _tv.copy(muzzleP).addScaledVector(_hd,0.3);tracer(_tv,end);
 }
-const BLEED=10;
+const BLEED=20;
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 function inCombat(){return enemies.some(e=>e.alive&&e.aggro&&e.pos.distanceTo(player.pos)<20);}
 const FF_LINES={hit:['Check your fire!','That was me! Watch it!','You hit me! I’m on your side!']};
@@ -2347,7 +2502,7 @@ function update(dt){
     const cd=consoleObj?Math.hypot(consoleObj.position.x-player.pos.x,consoleObj.position.z-player.pos.z):99;
     if(cd<2.2&&player.hp>0){consoleHold+=dt;
       if(!liftStarted){liftStarted=true;radio(['POLEMOS','Cable\u2019s moving. Something down there is moving too.'],true);
-        [[0.8,'scorpion',2],[6,'scorpion',1],[9.5,'scorpion',3]].forEach(([tt,ty,n])=>events.push({t:tt,fn:()=>{for(let i=0;i<n;i++)pitSpawn(ty);
+        [[0.8,'scorpion',1],[5,'scorpion',1],[9,'scorpion',1]].forEach(([tt,ty,n])=>events.push({t:tt,fn:()=>{for(let i=0;i<n;i++)pitSpawn(ty);
           if(ty==='scorpion'){sfx.skitter();if(!saidScorp&&heardOnce('scorpion')){saidScorp=true;radio(['POLEMOS','Those aren\u2019t wolves. Something with claws is climbing out of the shaft!']);}else{saidScorp=true;toast('MORE COMING UP THE SHAFT');}}else{sfx.growl();toast('MORE COMING UP THE SHAFT');}}}));}}
     else consoleHold=Math.max(0,consoleHold-dt*0.6);
     if(consoleScr)consoleScr.material.color.setHex(consoleHold>0?0xc9a24a:0x7a0c08);
@@ -2448,6 +2603,13 @@ async function clearAppCache(){
   try{if(navigator.serviceWorker){for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();}}catch(e){}
 }
 function reloadFresh(){const u=new URL(location.href);u.searchParams.set('r',Date.now());location.replace(u.toString());}
+function renderCollection(){
+  $('colStats').innerHTML=`<span>LOGS <b>${notesFound.length}/${NOTES.length}</b></span><span>ARMORY <b>${armory.filter(a=>WEAP[a]).length}/2</b></span><span>KRONER <b>${cash}</b></span>`;
+  $('colList').innerHTML=NOTES.map((N,i)=>notesFound.includes(i)?`<details><summary>${N.t}</summary><p>${N.b}<cite>\u2014 ${N.c}</cite></p></details>`:`<div class="lock">\u2014 NOT RECOVERED \u2014</div>`).join('');}
+$('toLoadout').onclick=()=>{$('title').hidden=true;$('loadout').hidden=false;};
+$('loBack').onclick=()=>{$('loadout').hidden=true;$('title').hidden=false;};
+$('toCollection').onclick=()=>{renderCollection();$('title').hidden=true;$('collection').hidden=false;};
+$('colBack').onclick=()=>{$('collection').hidden=true;$('title').hidden=false;};
 $('toSettings').onclick=()=>{$('title').hidden=true;$('settings').hidden=false;$('setMsg').textContent='';$('resetBtn').classList.remove('armed');$('resetBtn').textContent='RESET ALL DATA';};
 $('setBack').onclick=()=>{$('settings').hidden=true;$('title').hidden=false;};
 $('updBtn').onclick=async()=>{$('setMsg').textContent='Refreshing\u2026';await clearAppCache();reloadFresh();};
