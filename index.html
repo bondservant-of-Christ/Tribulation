@@ -558,6 +558,7 @@ function buildSets(){
   heli.userData={rotor,trot,nav,beam};heli.visible=false;scene.add(heli);
 }
 let hail=null,ridgeFire=null,hailOn=false,fireOn=0,hailHiss=0;
+let fireLight=null,horizonGlow=null,serpent=null,fireFog=null;const FIRE_FOG=new THREE.Color(0x140402);
 function buildWeather(){
   const N=520,pos=new Float32Array(N*6);hail={N,pos,v:new Float32Array(N)};
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
@@ -574,6 +575,29 @@ function buildWeather(){
   const col=new Float32Array(fp.length);fg.setAttribute('color',new THREE.BufferAttribute(col,3));
   ridgeFire=new THREE.Points(fg,new THREE.PointsMaterial({size:2.6,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
   ridgeFire.userData.base=fp.slice();ridgeFire.userData.reach=fp.map((_,i)=>i%3===0?(fp[i]+20)/154:0);ridgeFire.visible=false;scene.add(ridgeFire);
+  // the burning treeline: bare trunks along the ridge, black against the flames
+  const trM=new THREE.MeshBasicMaterial({color:0x050302});
+  for(let i=0;i<fp.length;i+=15){const h=rand(2.5,4.5),tr=new THREE.Mesh(new THREE.ConeGeometry(rand(0.4,0.8),h,4),trM);tr.position.set(fp[i],fp[i+1]+h/2-0.4,fp[i+2]);ridge.add(tr);}
+  // firelight off the ridge, enough to pick the ridge and the mountain faces out of the dark
+  fireLight=new THREE.PointLight(0xff5a1e,0,260,1);fireLight.position.set(50,10,-56);scene.add(fireLight);
+  // a red glow low on the horizon, behind the mountains, so they stand out as shapes
+  const hz=canvasTex(4,64,(x,w,h)=>{const g=x.createLinearGradient(0,h,0,0);g.addColorStop(0,'rgba(255,110,40,1)');g.addColorStop(.25,'rgba(200,50,20,.75)');g.addColorStop(.6,'rgba(90,14,8,.3)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,w,h);});
+  hz.magFilter=hz.minFilter=THREE.LinearFilter;
+  horizonGlow=new THREE.Mesh(new THREE.PlaneGeometry(1600,300),new THREE.MeshBasicMaterial({map:hz,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  horizonGlow.position.set(50,120,-262);horizonGlow.renderOrder=1;horizonGlow.visible=false;scene.add(horizonGlow);
+  // Leviathan: the eye belongs to a head too big for any body to be seen. Pure black, only ever a shape against the glow.
+  // Units are scaled so the eye sits at (0,0) and lines up with the sky eye from the ending cameras.
+  const U=46,sh=new THREE.Shape(),HP=[[-5.2,-1.0],[-4.2,0.0],[-2.8,0.9],[-1.6,1.75],[-0.2,2.1],[1.2,2.0],[1.7,2.7],[2.2,1.95],[2.9,2.9],[3.4,1.85],[4.0,2.6],[4.3,1.6],[5.0,0.6],[5.6,-1.5],[6.2,-5.0],[6.6,-8.5],[2.6,-8.5],[2.2,-4.5],[1.6,-2.6],[-0.5,-2.35],[-2.6,-2.2],[-4.0,-1.9],[-5.0,-1.5],[-2.4,-1.3]];
+  sh.moveTo(HP[0][0]*U,HP[0][1]*U);for(let i=1;i<HP.length;i++)sh.lineTo(HP[i][0]*U,HP[i][1]*U);
+  const hg=new THREE.ShapeGeometry(sh);
+  serpent=new THREE.Group();serpent.position.set(50,151,-250);
+  // the sky layers write no depth and draw back to front by renderOrder: the render target's depth buffer is too coarse out here to sort them
+  const head=new THREE.Mesh(hg,new THREE.MeshBasicMaterial({color:0x000000,transparent:true,depthWrite:false,fog:false}));head.renderOrder=4;serpent.add(head);
+  const rim=new THREE.Mesh(hg,new THREE.MeshBasicMaterial({color:0x8a1a0c,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  rim.scale.setScalar(1.025);rim.renderOrder=3;serpent.add(rim);
+  const halo=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:texGlow,color:0xd8441a,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  halo.scale.set(1500,1200,1);halo.position.set(0,40,0);halo.renderOrder=2;serpent.add(halo);
+  serpent.userData={rim,halo};serpent.visible=false;scene.add(serpent);
 }
 function updateWeather(dt){
   if(hail){hail.m.visible=hailOn;
@@ -587,6 +611,15 @@ function updateWeather(dt){
     if(fireOn>0){const col=ridgeFire.geometry.attributes.color.array,pp=ridgeFire.geometry.attributes.position.array,b=ridgeFire.userData.base,r=ridgeFire.userData.reach;
       for(let i=0;i<col.length;i+=3){const lit=fireOn>r[i]?1:0,f=lit*(0.55+0.45*Math.random());col[i]=f;col[i+1]=f*rand(0.25,0.5);col[i+2]=f*0.08;pp[i+1]=b[i+1]+lit*Math.random()*0.5;}
       ridgeFire.geometry.attributes.color.needsUpdate=true;ridgeFire.geometry.attributes.position.needsUpdate=true;}}
+  if(serpent){const r=clamp(fireOn,0,1),on=r>0,rv=clamp((r-0.2)/0.8,0,1),fl=0.85+0.15*Math.sin(t*7.3)*Math.sin(t*3.1);
+    horizonGlow.visible=on;serpent.visible=on&&eyeOpen>0.5;
+    horizonGlow.material.opacity=r*0.6*fl;serpent.userData.halo.material.opacity=rv*0.8*fl;serpent.userData.rim.material.opacity=rv*0.9*fl;
+    fireLight.intensity=on?r*1.6*fl:0;
+    // the glow and the head sit far behind the mountains; push the far plane out while they are up
+    if(on&&camera.far!==700){camera.far=700;camera.updateProjectionMatrix();}else if(!on&&camera.far!==320){camera.far=320;camera.updateProjectionMatrix();}
+    if(on){if(!fireFog)fireFog={near:scene.fog.near,far:scene.fog.far,col:scene.fog.color.getHex()};
+      scene.fog.near=lerp(fireFog.near,60,r);scene.fog.far=lerp(fireFog.far,300,r);scene.fog.color.setHex(fireFog.col).lerp(FIRE_FOG,r);}
+    else if(fireFog){scene.fog.near=fireFog.near;scene.fog.far=fireFog.far;scene.fog.color.setHex(fireFog.col);fireFog=null;}}
 }
 let heliThump=0;
 function updateSets(dt){
@@ -1990,8 +2023,8 @@ const ENDING=[
   {d:6,text:'',cam:k=>{eyeOpen=ss((k-0.15)/0.8);const sh=(1-k)*0.25*(k>0.15?1:0);camAt(51.5+rand(-sh,sh),4.5+rand(-sh,sh),97+rand(-sh,sh),50,26,-30);},on:()=>sfx.rumble()},
   {d:6,text:'Something above Site 9 has opened its eye.',cam:k=>{eyeOpen=1;camAt(51.5,4.5+k*0.4,97-k*4,50,26+k*2,-30);}},
   {d:6,who:'SCAR',text:'…That’s not ice.',on:()=>{hailOn=true;},cam:k=>{eyeOpen=1;camAt(51,2.6+k*0.6,90,50,lerp(14,22,k),-30);}},
-  {d:8,text:'Along the ridge the treeline catches, one tree after the next, like a fuse.',on:()=>{fireOn=0.001;sfx.rumble();},cam:k=>{eyeOpen=1;fireOn=Math.max(0.001,ss(k*1.15));camAt(50+k*2,5.5,34,50,13,-60);}},
-  {d:8,who:'CMDR. VALE',text:'Horsemen, the road is gone. Get to the coast. Site 9 has a sea intake on the fjord. We will pull you out there.',on:()=>sfx.radio(),cam:k=>{eyeOpen=1;fireOn=1;camAt(49,3+k,40+k*4,50,11,-60);}}
+  {d:8,text:'Along the ridge the treeline catches, one tree after the next, like a fuse.',on:()=>{fireOn=0.001;sfx.rumble();},cam:k=>{eyeOpen=1;fireOn=Math.max(0.001,ss(k*1.15));camAt(50+k*2,5.5,34,50,lerp(13,44,ss((k-0.35)/0.65)),-60);}},
+  {d:8,who:'CMDR. VALE',text:'Horsemen, the road is gone. Get to the coast. Site 9 has a sea intake on the fjord. We will pull you out there.',on:()=>sfx.radio(),cam:k=>{eyeOpen=1;fireOn=1;camAt(49,3+k,40+k*4,50,44,-60);}}
 ];
 function playCine(shots,onEnd){
   cine={shots,i:-1,t:0,onEnd,full:'',shown:0};state='cine';hemi.intensity=0.45;scene.fog.near=20;scene.fog.far=60;camera.fov=50;camera.updateProjectionMatrix();if(player){player.obj.visible=true;player.obj.rotation.y=player.yaw+Math.PI;}
