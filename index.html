@@ -137,6 +137,10 @@ body.noCursor #c{cursor:none}
 }
 #pause,#over,#win{background:rgba(7,5,5,.97)}
 #cine{position:fixed;inset:0;z-index:15}
+#cineCard{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);width:min(86vw,520px);background:rgba(10,7,6,.94);border:1px solid var(--rust);padding:16px 20px;display:grid;gap:8px}
+#cineCard h3{margin:0;font-family:var(--mono);font-weight:400;font-size:16px;letter-spacing:.16em;color:var(--blood)}
+#cineCard p{margin:0;font-family:var(--scripture);font-size:clamp(17px,min(4.4vw,5vh),21px);line-height:1.3;color:var(--bone)}
+#cineCard cite{font-style:normal;font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:var(--brass)}
 #cine .cbar{position:absolute;left:0;right:0;width:auto;height:auto;border:0;background:#000}
 #cine .cbarTop{top:0;height:calc(9vh + env(safe-area-inset-top,0px))}
 #cine .cbarBot{bottom:0;min-height:calc(15vh + env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:center;padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -183,12 +187,13 @@ body.noCursor #c{cursor:none}
 <div id="cine" hidden>
   <div class="cbar cbarTop"></div>
   <div class="cbar cbarBot"><div class="cineLine"><span id="cineWho"></span><span id="cineText"></span></div></div>
+  <div id="cineCard" hidden><h3 id="ccT"></h3><p id="ccB"></p><cite id="ccC"></cite></div>
   <button id="cineSkip">SKIP &rsaquo;</button>
 </div>
 
 <div class="overlay" id="title">
   <div class="panel">
-    <div class="eyebrow">REMNANT MILITIA · THE YEAR OF TRUMPETS</div>
+    <div class="eyebrow">THE HORSEMEN · NORWAY, 2077</div>
     <h1>Tribu&shy;lation</h1>
     <blockquote>Eleven days ago the drill at Site 9 stopped. Three days ago the mine stopped answering. Tonight the stars over the ridge started going out.</blockquote>
     <button class="cta" id="toMissions">MISSIONS</button>
@@ -403,6 +408,114 @@ const embers=(function(){const n=420,g=new THREE.BufferGeometry(),a=new Float32A
   g.setAttribute('position',new THREE.BufferAttribute(a,3));
   const p=new THREE.Points(g,new THREE.PointsMaterial({color:0xff6a3a,size:2,sizeAttenuation:false,fog:false}));scene.add(p);return p;})();
 let introT=0;const INTRO=4.2;
+
+// ================= PROLOGUE SETS: Nordkapp Command, the mountains, the gunship =================
+const CR={x:300,z:300};
+const setLights=[new THREE.PointLight(0x9fb4c8,0,10,2),new THREE.PointLight(0xc42a24,0,9,2),new THREE.PointLight(0xffd8a0,0,26,1.4)];
+setLights.push(new THREE.PointLight(0xd8dde4,0,4.5,2));setLights.forEach(l=>scene.add(l));setLights[3].position.set(CR.x+0.7,2.0,CR.z-1.1);
+setLights[0].position.set(CR.x,2.2,CR.z-3.2);setLights[1].position.set(CR.x+1.5,3.0,CR.z+1.5);
+let vale=null,heli=null,heliState=null,monitors=[];
+function monCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const tx=new THREE.CanvasTexture(c);tx.magFilter=THREE.NearestFilter;tx.minFilter=THREE.NearestFilter;return {c,x:c.getContext('2d'),tx};}
+const MON_DRAW=[
+  // waterfall: noise rows scrolling, one narrow carrier that will not go away
+  (m,x,w,h,tt)=>{const img=x.getImageData(0,0,w,h-12);x.putImageData(img,0,1);
+    for(let i=0;i<w;i++){let v=Math.random()*60;if(Math.abs(i-w*0.62)<1)v=120+80*(0.5+0.5*Math.sin(tt*0.7));x.fillStyle=`rgb(${v*0.9|0},${v*0.25|0},${v*0.2|0})`;x.fillRect(i,0,1,1);}
+    x.fillStyle='#000';x.fillRect(0,h-12,w,12);x.fillStyle='#c9a24a';x.font='8px monospace';x.fillText('ARRAY-3  1420.405 MHz  CARRIER: UNRESOLVED',2,h-3);},
+  // sky survey: the count keeps ticking down, a hole keeps growing
+  (m,x,w,h,tt)=>{x.fillStyle='#050404';x.fillRect(0,0,w,h);if(!m.st){m.st=[];for(let i=0;i<220;i++)m.st.push([Math.random()*w,Math.random()*(h-14)]);}
+    const cx=w*0.58,cy=(h-14)*0.42,rr=8+((tt*1.3)%28);
+    x.strokeStyle='rgba(120,30,25,.35)';for(let i=1;i<4;i++){x.beginPath();x.moveTo(i*w/4,0);x.lineTo(i*w/4,h-14);x.stroke();}
+    let vis=0;for(const [a,b] of m.st){if(Math.hypot(a-cx,b-cy)<rr)continue;vis++;x.fillStyle=Math.random()<0.03?'#fff':'#bdb3a6';x.fillRect(a|0,b|0,1,1);}
+    x.fillStyle='#c9a24a';x.font='8px monospace';x.fillText('SKY SURVEY N-41  CATALOGUED 2881  VISIBLE '+(2661+vis),2,h-3);},
+  // waveform with a pulse on a 9.01 s period
+  (m,x,w,h,tt)=>{x.fillStyle='#050404';x.fillRect(0,0,w,h);x.strokeStyle='#3a1210';for(let i=0;i<w;i+=16){x.beginPath();x.moveTo(i,0);x.lineTo(i,h-14);x.stroke();}
+    x.strokeStyle='#d8302a';x.beginPath();for(let i=0;i<w;i++){const ph=(tt-(w-i)*0.06)%9.01;const sp=ph<0.35?Math.sin(ph/0.35*Math.PI)*20:0;const y=(h-14)/2+Math.sin(i*0.35+tt*3)*2+Math.random()*1.5-sp;i?x.lineTo(i,y):x.moveTo(i,y);}x.stroke();
+    x.fillStyle='#c9a24a';x.font='8px monospace';x.fillText('BAND 21cm  PERIOD 9.01 s  SOURCE: NONE',2,h-3);},
+  // azimuth return ring, one third dark
+  (m,x,w,h,tt)=>{x.fillStyle='#050404';x.fillRect(0,0,w,h);const cx=w/2,cy=(h-14)/2,R=(h-14)*0.42;
+    for(let i=0;i<72;i++){const a=i/72*TAU+tt*0.05,dark=((a%TAU)+TAU)%TAU>3.6&&((a%TAU)+TAU)%TAU<5.7;const v=dark?6+Math.random()*6:20+Math.random()*18;
+      x.strokeStyle=dark?'#1a0a08':'#a8241e';x.beginPath();x.moveTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);x.lineTo(cx+Math.cos(a)*(R+v*0.5),cy+Math.sin(a)*(R+v*0.5));x.stroke();}
+    x.strokeStyle='#3a1210';x.beginPath();x.arc(cx,cy,R,0,TAU);x.stroke();x.beginPath();x.arc(cx,cy,R*0.35,0,TAU);x.stroke();
+    x.fillStyle='#c9a24a';x.font='8px monospace';x.fillText('AZIMUTH RETURN  INTEGRATED 72h',2,h-3);},
+  // Site 9 telemetry
+  (m,x,w,h,tt)=>{x.fillStyle='#050404';x.fillRect(0,0,w,h);x.font='9px monospace';
+    const L2=['SITE 9 / KESSEL','LINK ............ NO CARRIER','DRILL 4 ......... HALT 6600 m','LV3 CLOCKS ...... 09:01','DEEP TAP pH ..... 3.1','CREW ............ 41 / 0 ACK'];
+    L2.forEach((s,i)=>{x.fillStyle=i===1&&(tt%1.2)<0.6?'#ff3a2a':(i?'#bdb3a6':'#c9a24a');x.fillText(s,4,12+i*12);});},
+  // insertion route
+  (m,x,w,h,tt)=>{x.fillStyle='#050404';x.fillRect(0,0,w,h);x.strokeStyle='#2a1210';for(let i=0;i<6;i++){x.beginPath();x.arc(w*0.3,h*0.6,10+i*12,0,TAU);x.stroke();}
+    x.strokeStyle='#c9a24a';x.setLineDash([3,3]);x.beginPath();x.moveTo(8,h-18);x.quadraticCurveTo(w*0.5,h*0.2,w*0.78,h*0.4);x.stroke();x.setLineDash([]);
+    x.fillStyle=(tt%1)<0.5?'#ff3a2a':'#5a120e';x.fillRect(w*0.78-2,h*0.4-2,5,5);
+    x.fillStyle='#c9a24a';x.font='8px monospace';x.fillText('HORSEMEN / INSERTION NORDLAND',2,h-4);},
+];
+function buildSets(){
+  // ---- command room
+  const room=new THREE.Group();room.position.set(CR.x,0,CR.z);scene.add(room);
+  const wallM=new THREE.MeshPhongMaterial({color:0x1a1b1d,side:THREE.BackSide,flatShading:true,shininess:6});
+  const shell=new THREE.Mesh(new THREE.BoxGeometry(10,3.4,9),wallM);shell.position.set(0,1.7,0.5);shell.receiveShadow=true;room.add(shell);
+  const floorM=new THREE.MeshPhongMaterial({color:0x121314,map:texFloor,shininess:20,specular:0x222222});
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(10,9),floorM);fl.rotation.x=-Math.PI/2;fl.position.set(0,0.01,0.5);room.add(fl);
+  // monitor wall
+  mk(box(5.2,2.5,0.25),L(0x0d0e0f),0,1.95,-3.9,room);
+  for(let r=0;r<2;r++)for(let c=0;c<3;c++){const i=r*3+c,mc=monCanvas(160,100);
+    const sc=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.94),new THREE.MeshBasicMaterial({map:mc.tx,fog:false}));sc.position.set((c-1)*1.62,1.45+r*1.02,-3.76);room.add(sc);
+    mk(box(1.58,1.02,0.06),L(0x070708),(c-1)*1.62,1.45+r*1.02,-3.8,room);
+    monitors.push({...mc,draw:MON_DRAW[i],w:160,h:100});}
+  // consoles and the plotting table
+  mk(rbox(5,0.85,0.8,0.02),L(0x1c1d1f),0,0.42,-3.1,room);mk(box(5,0.04,0.5),BASIC(0x3a0c0a),0,0.86,-3.05,room);
+  mk(rbox(2.2,0.9,1.2,0.02),L(0x18191a),0,0.45,0.9,room);
+  const holo=new THREE.Mesh(new THREE.CircleGeometry(0.5,24),BASIC(0x7a1410,{transparent:true,opacity:0.5}));holo.rotation.x=-Math.PI/2;holo.position.set(0,0.92,0.9);room.add(holo);
+  for(let i=0;i<3;i++){const rg=new THREE.Mesh(new THREE.RingGeometry(0.15+i*0.12,0.16+i*0.12,24),BASIC(0xc42a24,{transparent:true,opacity:0.6}));rg.rotation.x=-Math.PI/2;rg.position.set(0,0.93,0.9);room.add(rg);}
+  for(const sx of[-4.6,4.6])for(let i=0;i<4;i++)mk(rbox(0.6,2.2,0.5,0.02),L(0x141516),sx,1.1,-2.5+i*1.4,room);
+  for(const sx of[-4.6,4.6])for(let i=0;i<4;i++)mk(box(0.02,0.04,0.3),BASIC(i%2?0xc42a24:0x5a5e60),sx*0.93,1.6,-2.5+i*1.4,room);
+  for(let i=0;i<3;i++)mk(box(1.6,0.04,0.25),BASIC(0x2a2c30),(i-1)*3,3.36,0.5,room);
+  // Commander Vale
+  vale=makeHuman({officer:true,armor:0x1b1c1e,armor2:0x101112,glow:0xd8302a,suit:0x1a1b1d,body:'f',guns:[]});
+  vale.position.set(CR.x,0,CR.z-2.3);vale.rotation.y=Math.PI;scene.add(vale);
+  // ---- mountains ringing the valley
+  const mtn=new THREE.Group();scene.add(mtn);
+  const rockM=new THREE.MeshPhongMaterial({color:0x26282b,flatShading:true,shininess:4}),snowM=new THREE.MeshPhongMaterial({color:0x9aa0a6,flatShading:true,shininess:4});
+  for(let i=0;i<34;i++){const a=i/34*TAU+rand(-0.05,0.05),r=rand(170,260),h=rand(45,95),w=rand(30,55);
+    const x=50+Math.cos(a)*r,z=60+Math.sin(a)*r;
+    const m1=new THREE.Mesh(new THREE.ConeGeometry(w,h,6+(i%3)),rockM);m1.position.set(x,h/2-2,z);m1.rotation.y=rand(0,TAU);mtn.add(m1);
+    const m2=new THREE.Mesh(new THREE.ConeGeometry(w*0.38,h*0.38,6+(i%3)),snowM);m2.position.set(x,h-2-h*0.19+0.5,z);m2.rotation.y=m1.rotation.y;mtn.add(m2);}
+  // ---- the gunship
+  heli=new THREE.Group();const hb=new THREE.Group();heli.add(hb);
+  const hm=new THREE.MeshPhongMaterial({color:0x1d1f22,flatShading:true,shininess:20,specular:0x222222}),hd=new THREE.MeshPhongMaterial({color:0x111214,flatShading:true});
+  mk(rbox(1.7,1.5,4.0,0.2),hm,0,1.3,0.2,hb);
+  mk(rbox(1.5,1.1,1.4,0.2),new THREE.MeshPhongMaterial({color:0x0b1216,specular:0x8899aa,shininess:90,flatShading:true}),0,1.45,2.3,hb).rotation.x=0.35;
+  mk(rbox(0.5,0.6,4.2,0.06),hm,0,1.6,-3.6,hb);
+  mk(rbox(0.12,1.3,0.9,0.04),hm,0,2.2,-5.5,hb);mk(rbox(1.6,0.1,0.6,0.03),hm,0,1.6,-5.4,hb);
+  for(const sd of[-1,1]){mk(box(0.08,0.08,3.2),hd,sd*0.95,0.15,0.3,hb);mk(box(0.06,0.6,0.06),hd,sd*0.9,0.45,1.3,hb);mk(box(0.06,0.6,0.06),hd,sd*0.9,0.45,-0.7,hb);
+    mk(rbox(0.5,0.4,1.2,0.05),hm,sd*1.05,1.1,0.4,hb);}
+  mk(new THREE.CylinderGeometry(0.12,0.12,0.4,8),hd,0,2.25,0.3,hb);
+  const rotor=new THREE.Group();rotor.position.set(0,2.45,0.3);hb.add(rotor);
+  for(let i=0;i<4;i++){const bl=mk(box(7.2,0.03,0.28),hd,0,0,0,rotor);bl.rotation.y=i*Math.PI/4;}
+  const trot=new THREE.Group();trot.position.set(0.12,2.3,-5.6);hb.add(trot);for(let i=0;i<2;i++){const bl=mk(box(0.03,1.4,0.14),hd,0,0,0,trot);bl.rotation.x=i*Math.PI/2;}
+  const nav=mk(sph(0.06,6,4),BASIC(0xff2a1a,{fog:false}),0,2.85,-5.5,hb);nav.castShadow=false;
+  const navG=mk(sph(0.05,6,4),BASIC(0xff2a1a,{fog:false}),-0.95,1.1,1.0,hb);navG.castShadow=false;
+  const beam=new THREE.Mesh(new THREE.ConeGeometry(3,12,16,1,true),new THREE.MeshBasicMaterial({color:0xfff2d0,transparent:true,opacity:0.05,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+  beam.visible=false;hb.add(beam);
+  heli.userData={rotor,trot,nav,beam};heli.visible=false;scene.add(heli);
+}
+let heliThump=0;
+function updateSets(dt){
+  if(heli&&heli.visible){heli.userData.rotor.rotation.y+=dt*24;heli.userData.trot.rotation.x+=dt*30;heli.userData.nav.visible=(t%1)<0.15;
+    const dd=camera.position.distanceTo(heli.position);heliThump-=dt;if(heliThump<=0){heliThump=0.105;const v=clamp(1-dd/140,0,1);if(v>0.02){noise(0.08,85,0.7,0.32*v);noise(0.05,240,1.5,0.06*v);}}
+    setLights[2].position.set(heli.position.x,heli.position.y-2,heli.position.z+2);setLights[2].intensity=heli.position.y<40&&state!=='title'?1.5:0;
+    if(heliState==='depart'){heli.position.y+=dt*3.5;heli.position.z+=dt*9;heli.rotation.x=-0.12;if(heli.position.z>260){heli.visible=false;heliState=null;setLights[2].intensity=0;}}}
+  if(vale&&camera.position.distanceTo(vale.position)<14){animHuman(vale,dt,0,0,-1);
+    if(!updateSets.mt||t-updateSets.mt>0.09){updateSets.mt=t;for(const m of monitors){m.draw(m,m.x,m.w,m.h,t);m.tx.needsUpdate=true;}}
+    setLights[0].intensity=1.6+Math.sin(t*13)*0.1;setLights[1].intensity=0.9;setLights[3].intensity=1.3;}
+  else{setLights[0].intensity=0;setLights[1].intensity=0;setLights[3].intensity=0;}
+}
+// actor staging for the prologue
+const STAGE={
+  room(){const P=[player.obj,...allies.map(a=>a.obj)];P.forEach((o,i)=>{o.visible=true;o.position.set(CR.x-1.65+i*1.1,0,CR.z+1.9+(i%2)*0.25);o.rotation.y=Math.PI;});
+    hemi.intensity=0.12;scene.fog.near=8;scene.fog.far=30;},
+  sky(){const P=[player.obj,...allies.map(a=>a.obj)];P.forEach(o=>o.visible=false);hemi.intensity=0.75;scene.fog.near=70;scene.fog.far=360;heli.visible=true;setLights[2].intensity=0;},
+  yard(){player.pos.copy(player.home);player.obj.visible=true;allies.forEach((a,i)=>{a.obj.visible=true;a.pos.set(player.home.x+(i-1)*1.4,0,player.home.z+1.8);a.obj.rotation.y=Math.PI;});
+    hemi.intensity=0.3;scene.fog.near=20;scene.fog.far=90;}
+};
 
 // ================= MAP =================
 const S=2.5, WH=2.6, GW=40, GH=46;
@@ -654,6 +767,7 @@ const texArmor=canvasTex(64,64,(x,w,h)=>{x.fillStyle='#e2e2e2';x.fillRect(0,0,w,
 texArmor.wrapS=texArmor.wrapT=THREE.RepeatWrapping;
 function armorMat(c){return new THREE.MeshPhongMaterial({color:c,map:texArmor,shininess:14,specular:0x161616,flatShading:true});}
 function makeOperator(o){
+  const OFF=!!o.officer;
   const F=o.body==='f',SW=F?0.168:0.2,AS=F?0.88:1.14,TS=F?1.05:1.07,PS=F?0.9:1.14;
   const A=armorMat(o.armor||0x34383c),A2=armorMat(o.armor2||0x1c1e20);
   const suit=camoMat(o.suit||(F?0x232528:0x2f352f)),glove=L(0x17181a),boot=L(0x141516),sole=L(0x2e2f30),rubber=L(0x1d1f21),pouch=L(o.pouch||(F?0x141516:0x1d1f21)),mag=L(0x26282a);
@@ -699,7 +813,7 @@ function makeOperator(o){
   }
   const upper=G();upper.position.y=0.98;rig.add(upper);
   // ---- plate carrier with magazine pouches
-  {const cw=F?0.27:0.37;
+  if(!OFF){const cw=F?0.27:0.37;
    P(rbox(cw,0.26,0.06,0.02),A2,0,0.45,F?0.118:0.132,upper,-0.1);
    P(rbox(cw*0.92,0.28,0.055,0.02),A2,0,0.43,F?-0.118:-0.135,upper,0.08);
    const n=F?3:4;
@@ -712,7 +826,7 @@ function makeOperator(o){
    for(const sd of[-1,1])P(rbox(0.07,0.17,0.13,0.02),A2,sd*(SW-0.005),0.36,0.0,upper,0,0,sd*0.12);
    const col=DS(P(new THREE.CylinderGeometry(F?0.098:0.12,F?0.12:0.148,0.07,10,1,true),A2,0,0.615,0,upper));col.scale.z=0.92;}
   // ---- pack
-  {const jk=G();jk.position.set(0,0.42,F?-0.2:-0.215);upper.add(jk);
+  if(!OFF){const jk=G();jk.position.set(0,0.42,F?-0.2:-0.215);upper.add(jk);
    P(rbox(F?0.22:0.27,0.3,0.11,0.02),A2,0,0,0,jk);P(rbox(0.2,0.08,0.03,0.01),A,0,0.08,-0.065,jk);
    for(const sd of[-1,1]){P(new THREE.CylinderGeometry(0.036,0.048,0.1,8),A,sd*0.07,-0.19,0.0,jk);P(box(0.012,0.14,0.006),accent,sd*(F?0.095:0.115),0.0,-0.057,jk).castShadow=false;}
    P(rbox(0.1,0.03,0.05,0.01),rubber,0,0.165,0,jk);}
@@ -720,7 +834,33 @@ function makeOperator(o){
   const head=G();head.position.set(0,0.68,0.01);upper.add(head);
   mk(sph(0.105,10,8),suit,0,0.11,0,head).scale.set(0.9,1.08,1);
   const hel=G();hel.position.set(0,0.12,-0.005);head.add(hel);
-  if(!F){
+  if(OFF){
+    const skinM=new THREE.MeshPhongMaterial({color:0xb08a74,flatShading:true,shininess:6}),hairM=L(0x161413),capM=new THREE.MeshPhongMaterial({color:0x141517,flatShading:true,shininess:10});
+    // angular face: cranium, cheekbones, jaw, nose, brow
+    mk(sph(0.1,8,7),skinM,0,0.115,0.0,head).scale.set(0.88,1.05,1.0);
+    mk(rbox(0.13,0.075,0.1,0.02),skinM,0,0.04,0.035,head);
+    mk(rbox(0.09,0.03,0.07,0.012),skinM,0,0.012,0.05,head);
+    for(const sd of[-1,1]){mk(box(0.03,0.03,0.05),skinM,sd*0.05,0.085,0.07,head).rotation.y=sd*0.35;
+      mk(box(0.018,0.04,0.026),skinM,sd*0.093,0.1,-0.005,head);
+      mk(box(0.026,0.007,0.006),L(0x0a0a0a),sd*0.034,0.112,0.098,head);
+      mk(box(0.034,0.008,0.012),hairM,sd*0.035,0.13,0.096,head).rotation.z=-sd*0.12;}
+    mk(box(0.022,0.045,0.03),skinM,0,0.09,0.1,head).rotation.x=-0.25;
+    mk(box(0.036,0.005,0.005),L(0x7e5448),0,0.046,0.092,head);
+    // hair tied back under an officer's peaked cap
+    mk(rbox(0.19,0.07,0.17,0.02),hairM,0,0.1,-0.03,head);mk(sph(0.038,6,5),hairM,0,0.085,-0.115,head);
+    mk(new THREE.CylinderGeometry(0.128,0.106,0.05,8),capM,0,0.18,-0.006,head).rotation.x=-0.1;
+    mk(new THREE.CylinderGeometry(0.14,0.128,0.016,8),capM,0,0.21,-0.012,head).rotation.x=-0.12;
+    mk(new THREE.CylinderGeometry(0.109,0.109,0.018,8),redM,0,0.162,-0.002,head);
+    mk(rbox(0.17,0.012,0.08,0.006),capM,0,0.162,0.115,head).rotation.x=0.22;
+    // headset
+    mk(box(0.03,0.05,0.04),rubber,0.1,0.09,0,head);limbBetween(new V3(0.1,0.07,0.02),new V3(0.04,0.03,0.1),0.004,0.004,rubber,head);
+    // greatcoat
+    const coatM=L(0x17181a);coatM.side=THREE.DoubleSide;
+    mk(new THREE.CylinderGeometry(0.205,0.3,0.8,10,1,true),coatM,0,-0.35,0,hips);
+    mk(new THREE.CylinderGeometry(0.12,0.17,0.14,8,1,true),coatM,0,0.63,0,upper);
+    mk(box(0.02,0.62,0.012),L(0x0c0c0d),0.03,0.3,0.15,upper);mk(rbox(0.34,0.06,0.25,0.01),rubber,0,0.04,0,upper);
+  }
+  else if(!F){
     hel.scale.set(1,1.05,1.12);
     DS(P(new THREE.SphereGeometry(0.136,8,7,0,TAU,0,1.9),A,0,0,0,hel));
     // wedge visor: two angled glass planes meeting at the centre
@@ -757,7 +897,8 @@ function makeOperator(o){
   const arms=[];
   for(const sd of[-1,1]){
     const up=G();upper.add(up);const fore=G();upper.add(fore);
-    if(!F){
+    if(OFF){P(rbox(0.12,0.03,0.12,0.008),A2,sd*0.04,0.02,0,up,0,0,-sd*0.4);P(box(0.1,0.006,0.02),redM,sd*0.04,0.038,0,up,0,0,-sd*0.4);}
+    else if(!F){
       // stacked angular shoulder plates
       P(rbox(0.16*PS,0.04,0.18*PS,0.008),A,sd*0.03,0.01,0,up,0,0,-sd*0.45);
       P(rbox(0.14*PS,0.035,0.16*PS,0.008),A2,sd*0.06,-0.05,0,up,0,0,-sd*0.3);
@@ -1506,7 +1647,8 @@ function startMission(){
   ['title','missions','over','win','pause'].forEach(id=>$(id).hidden=true);$('hud').hidden=false;
   setObjective(0);eyeOpen=0;skyBlot=0;
   $('hud').hidden=true;
-  playCine(OPENING,()=>{state='play';player.obj.visible=false;player.yaw=0;player.pitch=0;$('hud').hidden=false;radio(['CALEB','Gate\u2019s up ahead. Lights are out. Stay on me.'],true);});
+  player.home=player.pos.clone();
+  playCine(OPENING,()=>{STAGE.yard();skyBlot=Math.max(skyBlot,0.32);heli.visible=true;heli.position.set(57,0.2,111);heli.rotation.set(0,Math.PI+0.3,0);state='play';player.obj.visible=false;player.yaw=0;player.pitch=0;$('hud').hidden=false;events.push({t:3,fn:()=>{heliState='depart';}});});
 }
 function pitSpawn(type){const a=rand(0,TAU),r=rand(0.4,1.6);const x=50+Math.cos(a)*r,z=10+Math.sin(a)*r;const w=spawnEnemy(type,x,z);w.pos.y=-1.6;w.aggro=true;w.home={x,z};w.mode='lunge';w.modeT=1.4;w.obj.rotation.y=rand(0,TAU);}
 // ================= CUTSCENES =================
@@ -1514,12 +1656,23 @@ let cine=null;
 const ss=k=>{k=clamp(k,0,1);return k*k*(3-2*k);};
 function camAt(px,py,pz,tx,ty,tz){camera.position.set(px,py,pz);camera.lookAt(tx,ty,tz);}
 const SKYCAM=(k,lx)=>{const p=player.pos;camAt(p.x+Math.sin(t*0.2)*0.3,2.2,p.z+6,p.x+(lx||0),45+k*6,p.z-160);};
+const RP=(x,y,z)=>[CR.x+x,y,CR.z+z];
+const cAt=(a,b)=>camAt(a[0],a[1],a[2],b[0],b[1],b[2]);
+const L3=(a,b,k)=>[lerp(a[0],b[0],k),lerp(a[1],b[1],k),lerp(a[2],b[2],k)];
 const OPENING=[
-  {d:6,text:'KESSEL MINE \u00b7 SITE 9 \u00b7 THE NORTHERN RANGE',cam:k=>SKYCAM(k,-10+k*6)},
-  {d:7,text:'Eleven days ago, Drill 4 stopped at six thousand six hundred meters. Not broken. Stopped.',cam:k=>SKYCAM(k,-4+k*6)},
-  {d:9,text:'Then the failures. Compasses pointing down. Every clock on the lower levels frozen on the same minute. Water from the deep tap that tasted bitter, like wormwood.',cam:k=>SKYCAM(k,2+k*4)},
-  {d:9,text:'Three days ago Site 9 stopped answering. The last thing the surface crew radioed in was about the sky.',cam:k=>{skyBlot=ss(k)*0.32;SKYCAM(k,6);},on:()=>sfx.howl()},
-  {d:6,who:'CMDR. VALE',text:'Remnant, you\u2019re the closest unit. Go in quiet. Find the crew, and find out what\u2019s wrong with that drill.',cam:k=>{const p=player.pos,e=ss(k);player.obj.visible=e<0.75;camAt(p.x,lerp(2.2,1.6,e),p.z+lerp(6,0,e),p.x,lerp(51,1.6,e),p.z+lerp(-160,-10,e));}}
+  {d:7,text:'NORDKAPP COMMAND · NORWAY · 2077',on:()=>STAGE.room(),cam:k=>cAt(L3(RP(-2.2,2.0,-1.6),RP(2.2,2.1,-1.8),ss(k)),L3(RP(-1.4,1.9,-3.8),RP(1.4,2.0,-3.8),ss(k)))},
+  {d:6,who:'CMDR. VALE',text:'Horsemen. Site 9 stopped answering three days ago.',cam:k=>cAt(RP(0.9-k*0.3,1.72,4.6-k*0.6),RP(0,1.6,-2.4))},
+  {d:9,who:'CMDR. VALE',text:'Eleven days ago their drill stopped at six thousand six hundred meters. Compasses started pointing down. Clocks froze on the same minute. The water went bitter.',cam:k=>cAt(L3(RP(-1.1,2.1,-2.2),RP(-1.3,2.15,-2.7),k),RP(-1.62,2.2,-3.8))},
+  {d:8,who:'CMDR. VALE',text:'The surface crew’s last call was about the sky. We’ve been listening to it ever since.',cam:k=>cAt(L3(RP(1.0,2.5,-2.3),RP(1.45,2.5,-2.9),k),RP(1.62,2.47,-3.8))},
+  {d:7,who:'CMDR. VALE',text:'You go in. You find the crew. You find out what is wrong with that drill.',cam:k=>{vale.rotation.y=lerp(Math.PI,0,ss(k*1.4));vale.userData.talkT=1.5;cAt(RP(0.6,1.25,-3.3),RP(0,1.6,0.5));}},
+  {d:8,who:'CMDR. VALE',text:'You cannot mess this up. There is no room for mistakes, do you understand?',cam:k=>{vale.rotation.y=0;vale.userData.talkT=1.5;cAt(L3(RP(0.34,1.56,-1.3),RP(0.22,1.54,-1.55),ss(k)),RP(0,1.56,-2.3));}},
+  {d:4,who:'CALEB',text:'Understood, Commander.',cam:k=>cAt(RP(0.2,1.65,-1.8),RP(-0.3,1.6,1.9))},
+  {d:9,card:{t:'HORSEMEN PROTOCOL · STANDING ORDER 0',b:'Everything you do past this point is permanent. There is no reload, no second chance, and no one coming to undo it.',c:'LOGGED · NORDKAPP COMMAND'},cam:k=>cAt(RP(0,2.0,-1.5),RP(0,2.0,-3.8))},
+  {d:7,text:'NORDLAND · 03:47',on:()=>{STAGE.sky();},cam:k=>{heli.position.set(lerp(84,64,k),lerp(42,32,k),lerp(200,150,k));heli.rotation.set(0.06,Math.PI+0.38,0.1);const h=heli.position;camAt(h.x-8,h.y-0.5,h.z-15,h.x,h.y+1.2,h.z);}},
+  {d:8,who:'PILOT',text:'Two minutes out. Floodlights are still burning down there… nobody’s answering the hail.',cam:k=>{heli.position.set(lerp(62,57,k),lerp(30,16,k),lerp(150,128,k));heli.rotation.set(0.08,Math.PI+0.2,0);const h=heli.position;camAt(h.x+5,h.y+4.5,h.z+13,lerp(h.x,52,0.5),lerp(h.y,2,0.6),h.z-40);}},
+  {d:7,who:'CALEB',text:'Ground’s clear. Gate’s dark. Stay on me.',on:()=>STAGE.yard(),cam:k=>{const e=ss(k);heli.position.set(57,lerp(14,0.2,Math.min(1,e*1.4)),lerp(130,111,Math.min(1,e*1.3)));heli.rotation.set(0,Math.PI+0.3,0);camAt(51,1.7,103,heli.position.x,heli.position.y+1.5,heli.position.z);}},
+  {d:7,who:'HANNAH',text:'…Is it just me, or are there fewer stars than there should be?',on:()=>sfx.howl(),cam:k=>{skyBlot=ss(k)*0.32;SKYCAM(k,4);}},
+  {d:4,text:'',cam:k=>{const p=player.pos,e=ss(k);player.obj.visible=e<0.75;camAt(p.x,lerp(2.2,1.6,e),p.z+lerp(6,0,e),p.x,lerp(51,1.6,e),p.z+lerp(-160,-10,e));}}
 ];
 const ENDING=[
   {d:5,text:'The lift comes up empty. The cage door is bent outward.',cam:k=>{const c=levelGroup.userData.cage;c.position.y=lerp(-8,0,ss(k*1.3));camAt(50,7,23,50,0.5,10);},on:()=>{sfx.door();sfx.rumble();}},
@@ -1536,9 +1689,10 @@ function nextShot(){
   cine.i++;cine.t=0;
   if(cine.i>=cine.shots.length){endCine();return;}
   const sh=cine.shots[cine.i];cine.full=sh.text||'';cine.shown=0;$('cineWho').textContent=sh.who||'';$('cineText').textContent='';
+  {const cd=$('cineCard');if(sh.card){$('ccT').textContent=sh.card.t;$('ccB').textContent=sh.card.b;$('ccC').textContent=sh.card.c;cd.hidden=false;sfx.radio();}else cd.hidden=true;}
   if(sh.on)sh.on();
 }
-function endCine(){if(!cine)return;const f=cine.onEnd;cine=null;$('cine').hidden=true;f&&f();}
+function endCine(){if(!cine)return;const f=cine.onEnd;cine=null;$('cine').hidden=true;$('cineCard').hidden=true;f&&f();}
 function updateCine(dt){
   const sh=cine.shots[cine.i];cine.t+=dt;const k=cine.t/sh.d;
   sh.cam(clamp(k,0,1));
@@ -2133,7 +2287,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='p
 
 // ================= LOOP =================
 const clock=new THREE.Clock();
-buildGrid();buildLevel();resize();renderArmory();
+buildGrid();buildLevel();buildSets();resize();renderArmory();
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(clock.getDelta(),0.05);
@@ -2141,7 +2295,7 @@ function loop(){
   if(state==='play')update(dt);
   else if(state==='over')deathT=Math.min(1,deathT+dt*1.1);
   else if(state==='cine'){updateCine(dt);if(player){animHuman(player.obj,dt,0,0,-1);allies.forEach(a=>animHuman(a.obj,dt,0,0,-1));}}
-  updateAmbient(dt);updateCamera(dt);
+  updateAmbient(dt);updateSets(dt);updateCamera(dt);
   renderer.setRenderTarget(rt);renderer.render(scene,camera);
   if((state==='play'||state==='paused')&&player&&player.hp>0){renderer.autoClear=false;renderer.clearDepth();renderer.render(vmScene,vmCam);renderer.autoClear=true;}
   renderer.setRenderTarget(null);renderer.render(postScene,postCam);
