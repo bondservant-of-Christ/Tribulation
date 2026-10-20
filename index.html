@@ -1719,7 +1719,6 @@ const OPENING=[
   {d:8,who:'CMDR. VALE',text:'The surface crew’s last call was about the sky. We’ve been listening to it ever since.',cam:k=>cAt(L3(RP(1.0,2.5,-2.3),RP(1.45,2.5,-2.9),k),RP(1.62,2.47,-3.8))},
   {d:7,who:'CMDR. VALE',text:'You go in. You find the crew. You find out what is wrong with that drill.',cam:k=>{vale.rotation.y=lerp(Math.PI,0,ss(k*1.4));vale.userData.talkT=1.5;cAt(RP(0.6,1.25,-3.3),RP(0,1.6,0.5));}},
   {d:8,who:'CMDR. VALE',text:'You cannot mess this up. There is no room for mistakes, do you understand?',cam:k=>{vale.rotation.y=0;vale.userData.talkT=1.5;cAt(L3(RP(0.34,1.56,-1.3),RP(0.22,1.54,-1.55),ss(k)),RP(0,1.56,-2.3));}},
-  {d:7,who:'CMDR. VALE',text:'Nikon, you have the lead. Scar, Polemos, on him. Necros… you have the rear. Nobody gets left down there.',cam:k=>{vale.rotation.y=0;vale.userData.talkT=1.5;cAt(L3(RP(-1.6,1.7,1.2),RP(-1.3,1.7,0.9),k),RP(0,1.62,-2.3));}},
   {d:4,who:'NIKON',text:'Understood, Commander.',cam:k=>cAt(RP(0.2,1.65,-1.8),RP(-0.3,1.6,1.9))},
   {d:9,card:{t:'HORSEMEN PROTOCOL · STANDING ORDER 0',b:'Everything you do past this point is permanent. There is no reload, no second chance, and no one coming to undo it.',c:'LOGGED · NORDKAPP COMMAND'},cam:k=>cAt(RP(0,2.0,-1.5),RP(0,2.0,-3.8))},
   {d:7,text:'NORDLAND · 03:47',on:()=>{STAGE.sky();},cam:k=>{heli.position.set(lerp(84,64,k),lerp(42,32,k),lerp(200,150,k));heli.rotation.set(0.06,Math.PI+0.38,0.1);const h=heli.position;camAt(h.x-8,h.y-0.5,h.z-15,h.x,h.y+1.2,h.z);}},
