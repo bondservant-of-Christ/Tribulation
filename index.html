@@ -829,10 +829,10 @@ function makeDoor(x,y,c){
 function solidish(x,y){const c=cell(x,y);return c==='#'||c==='H'||c==='D'||c==='R'||c==='B'||c==='G'||c==='c';}
 
 // collision: circle vs solid tiles
-function collide(p,r){
+function collide(p,r,swim){
   const [tx,ty]=tileAt(p.x,p.z);
   for(let yy=ty-1;yy<=ty+1;yy++)for(let xx=tx-1;xx<=tx+1;xx++){
-    if(!solidAt(xx,yy)&&cell(xx,yy)!=='~')continue; // water stops feet, not bullets or sight
+    if(!solidAt(xx,yy)&&(swim||cell(xx,yy)!=='~'))continue; // water stops feet, not bullets or sight
     const x0=xx*S,x1=x0+S,z0=yy*S,z1=z0+S;
     const cx=clamp(p.x,x0,x1),cz=clamp(p.z,z0,z1);let dx=p.x-cx,dz=p.z-cz,d2=dx*dx+dz*dz;
     if(d2<r*r){
@@ -2949,7 +2949,31 @@ function buildLevel2(){
   // ---- the dock and its fishing bench
   {const dm=new THREE.MeshPhongMaterial({map:texDeck,shininess:4}),post=L(0x2a2018);
    for(let y=97;y<=105;y++)for(const x of[25,26]){mk(box(S,0.14,S*0.98),dm,tw(x),0.07,tw(y),deco).receiveShadow=true;}
-   for(let y=97;y<=105;y+=2)for(const x of[24.9,27.1])mk(cyl(0.12,0.12,2.2,6),post,x*S,-0.6,tw(y),deco);}
+   for(let y=97;y<=105;y+=2)for(const x of[24.9,27.1])mk(cyl(0.12,0.12,2.2,6),post,x*S,-0.6,tw(y),deco);
+   const X0=62.6,X1=67.4,rope=L(0x8a7a5a),net=L(0x2e3428),netD=L(0x1e221c),orange=L(0xc8501a),white=L(0xd8d2c4),cage=L(0x2a2620),crateM=new THREE.MeshPhongMaterial({map:texCrate,shininess:4}),blue=L(0x2a4a6a),lampM=BASIC(0xffc878);
+   // rails down both sides, with nets hung over them to dry
+   for(const x of[X0,X1]){for(let z=244;z<=264;z+=2.5)mk(box(0.1,1.0,0.1),post,x,0.55,z,deco);mk(box(0.07,0.07,20.5),post,x,1.0,254,deco);}
+   for(const [x,z0,len] of [[X0,247,4.5],[X1,250.5,3.5],[X0,257,3],[X1,259.5,2.5]]){const n2=mk(box(0.04,0.9,len),net,x+(x<65?-0.04:0.04),0.62,z0+len/2,deco);n2.rotation.z=x<65?-0.08:0.08;
+     for(let i=0;i<len*2;i++)mk(sph(0.07,5,4),orange,x+(x<65?-0.08:0.08),1.05,z0+0.3+i*0.5,deco);}
+   // a pile of net and floats heaped at the base of the dock
+   {const pn=mk(sph(1,8,6),netD,63.6,0.2,245.4,deco);pn.scale.set(1.1,0.35,0.8);for(let i=0;i<5;i++)mk(sph(0.14,6,5),i%2?orange:white,63.4+rand(-0.6,0.6),0.42,245.4+rand(-0.5,0.5),deco);}
+   // lobster pots stacked along the rail, rope coils, buoys
+   for(const [x,z,st] of [[66.6,246.2,2],[66.6,247.2,1],[63.3,252.5,2],[66.7,256.4,3],[63.2,261.6,1]])for(let k=0;k<st;k++){const c=mk(box(0.75,0.45,0.55),cage,x,0.37+k*0.46,z,deco);c.rotation.y=rand(-0.2,0.2);mk(box(0.77,0.04,0.57),rope,x,0.6+k*0.46,z,deco);}
+   for(const [x,z] of [[64.2,249.6],[66.1,253.4],[63.6,258.8],[66.2,262.6]]){const r2=mk(new THREE.TorusGeometry(0.3,0.08,5,10),rope,x,0.2,z,deco);r2.rotation.x=Math.PI/2;mk(new THREE.TorusGeometry(0.22,0.07,5,10),rope,x,0.32,z,deco).rotation.x=Math.PI/2;}
+   for(const [x,z] of [[X0-0.2,251],[X1+0.2,255],[X0-0.2,262.8],[X1+0.2,246]]){mk(sph(0.32,8,6),orange,x,0.35,z,deco);mk(box(0.03,0.6,0.03),rope,x,0.8,z,deco);}
+   // fish crates in stacks, some knocked over
+   for(const [x,z,st,r] of [[66.4,250.2,3,0.1],[63.0,255.2,2,-0.2],[66.5,258.0,2,0.3],[63.3,263.3,2,0.15],[64.2,264.0,1,1.2]])for(let k=0;k<st;k++){const c=mk(box(0.7,0.32,0.5),crateM,x+rand(-0.06,0.06),0.3+k*0.33,z,deco);c.rotation.y=r+rand(-0.15,0.15);}
+   // a second bench halfway along, and a lamp at the end
+   {const b=new THREE.Group();b.position.set(66.6,0.14,252);b.rotation.y=-Math.PI/2;deco.add(b);mk(box(1.6,0.06,0.4),post,0,0.45,0,b);mk(box(1.6,0.3,0.04),post,0,0.7,-0.18,b);for(const x of[-0.7,0.7])mk(box(0.06,0.45,0.36),post,x,0.22,0,b);}
+   mk(cyl(0.07,0.09,3.4,6),post,X1-0.2,1.8,264.6,deco);mk(box(0.3,0.3,0.3),lampM,X1-0.45,3.4,264.6,deco);
+   // the boathouse, on stilts over the water beside the dock
+   {const b=new THREE.Group();b.position.set(72.5,0,247);deco.add(b);const wall=new THREE.MeshPhongMaterial({map:texPlank,shininess:6});
+    mk(box(5,3,6.5),wall,0,1.9,0,b);for(const x of[-2.2,2.2])for(const z of[-3,3])mk(cyl(0.14,0.14,2.4,6),post,x,-0.4,z,b);
+    const rf=mk(box(5.6,0.2,7),L(0x262a26),-1.2,3.9,0,b);rf.rotation.z=0.45;const rf2=mk(box(5.6,0.2,7),L(0x262a26),1.2,3.9,0,b);rf2.rotation.z=-0.45;
+    mk(box(2.4,2.2,0.06),L(0x1a1410),-1.3,1.4,3.26,b);}
+   // a small boat tied up, outboard tilted
+   {const b=new THREE.Group();b.position.set(69.5,-0.18,257);b.rotation.y=0.08;deco.add(b);mk(box(1.6,0.7,4.6),white,0,0.2,0,b);mk(box(1.4,0.5,4.2),blue,0,0.42,0,b);mk(box(1.3,0.06,0.5),post,0,0.55,0.4,b);
+    const ob=mk(box(0.3,0.7,0.4),L(0x1a1a1a),0,0.6,-2.4,b);ob.rotation.x=-0.5;const rl=mk(cyl(0.02,0.02,3,4),rope,-1.6,0.6,0.5,b);rl.rotation.z=Math.PI/2;}}
   // ---- stockfish racks (hjell): A-frames with poles and the catch hanging
   {const wd=L(0x3a2c20),fish=L(0x8a8478);
    for(const [rx,rz,len] of [[24,39.2,7],[25,94.6,6],[21,70,5]]){const g=new THREE.Group();g.position.set(tw(rx),0,tw(rz));deco.add(g);
@@ -3056,36 +3080,42 @@ function m2Sky(dawn,wrong){
 function m2Atmos(){m2Sky(m2.dawn,m2.wrong);scene.fog.near=26;scene.fog.far=lerp(90,170,clamp(m2.dawn,0,1))*(1-m2.wrong*0.3);}
 
 // ---- Leviathan leaving: the head tucks under the horizon and the body follows in arches
-const LEV_HP=[[-5.4,-0.9],[-5.1,-0.3],[-4.2,0.3],[-2.8,0.9],[-1.7,1.6],[-0.8,2.2],[0.4,2.25],[1.3,1.95],[2.3,2.1],[3.0,2.2],[4.6,3.1],[3.7,2.0],[5.4,2.6],[4.4,1.5],[6.0,1.7],[7.2,1.0],[8.5,1.0],[9.2,1.7],[9.6,0.95],[11.5,1.1],[12.2,1.8],[12.6,1.1],[15.0,0.9],[18.0,1.2],[18.0,-3.5],[15.0,-3.2],[12.0,-3.0],[9.0,-3.4],[6.0,-3.3],[3.6,-3.0],[2.0,-2.8],[1.0,-2.6],[-1.5,-2.3],[-3.4,-1.9],[-4.8,-1.4]];
-const LEV_N=120;
+// head only: the neck is the body, so the whole animal rides one path
+const LEV_HEAD=[[-5.4,-0.9],[-5.1,-0.3],[-4.2,0.3],[-2.8,0.9],[-1.7,1.6],[-0.8,2.2],[0.4,2.25],[1.3,1.95],[2.3,2.1],[3.0,2.2],[4.6,3.1],[3.7,2.0],[5.4,2.6],[4.4,1.5],[6.0,1.7],[6.8,0.4],[6.4,-1.8],[6.0,-3.3],[3.6,-3.0],[2.0,-2.8],[1.0,-2.6],[-1.5,-2.3],[-3.4,-1.9],[-4.8,-1.4]];
+const LEV={U:16,D:420,Xd:-100,A:95,B:35,lam:180,N:92,gap:13,r0:38,r1:8};
+const levY=u=>LEV.A*Math.sin(Math.PI*u/LEV.lam)-LEV.B;
+const levDY=u=>LEV.A*Math.PI/LEV.lam*Math.cos(Math.PI*u/LEV.lam);
 function buildLevRig(){
   const g=new THREE.Group();scene.add(g);const mat=new THREE.MeshBasicMaterial({color:0x000000,fog:false,side:THREE.DoubleSide});
-  const U=28,sh=new THREE.Shape();sh.moveTo(LEV_HP[0][0]*U,LEV_HP[0][1]*U);for(let i=1;i<LEV_HP.length;i++)sh.lineTo(LEV_HP[i][0]*U,LEV_HP[i][1]*U);
+  const U=LEV.U,sh=new THREE.Shape();sh.moveTo(LEV_HEAD[0][0]*U,LEV_HEAD[0][1]*U);for(let i=1;i<LEV_HEAD.length;i++)sh.lineTo(LEV_HEAD[i][0]*U,LEV_HEAD[i][1]*U);
   const head=new THREE.Mesh(new THREE.ShapeGeometry(sh),mat);g.add(head);
-  const body=new THREE.InstancedMesh(new THREE.SphereGeometry(1,10,8),mat,LEV_N);body.frustumCulled=false;g.add(body);
-  const spines=new THREE.InstancedMesh(new THREE.ConeGeometry(0.32,1.7,4),mat,LEV_N);spines.frustumCulled=false;g.add(spines);
+  const body=new THREE.InstancedMesh(new THREE.SphereGeometry(1,12,8),mat,LEV.N);body.frustumCulled=false;g.add(body);
+  const spines=new THREE.InstancedMesh(new THREE.ConeGeometry(0.3,1.7,4),mat,LEV.N*2);spines.frustumCulled=false;g.add(spines);
   g.visible=false;levRig={g,head,body,spines};
 }
-// lay the rig out for time tau (s) after the dive starts. Plane at distance D in front of camera position C, looking +z.
+// d: how far (m) the animal has travelled along its path. The path is a row of fixed arches rising out of the sea;
+// the head leads, noses over the crest and down into the water, and the body slides through the same arches after it.
 const _lm=new THREE.Matrix4(),_lq=new THREE.Quaternion(),_le=new THREE.Euler(),_ls=new V3(),_lp=new V3();
-function poseLev(C,headK,tau){
-  const D=300,R=levRig;R.g.position.set(C.x,0,C.z+D);
-  // head: starts above the horizon with the eye in it, then noses down and goes under
-  const dk=ss(headK);R.head.position.set(-30-70*dk,95-230*ss((headK-0.05)/0.75),0);R.head.rotation.z=-0.55*dk;
-  R.head.visible=headK<0.98;
-  const Xd=-90,A=58,lam=120,v=48;let n=0;
-  for(let i=0;i<LEV_N;i++){
-    const s=i*5,u=s-v*tau+40,taper=lerp(12,3.5,i/LEV_N);
-    if(u<0){continue;}
-    const y=A*Math.sin(Math.PI*u/lam)-taper*0.3,x=Xd+u;
-    if(y<-taper){continue;}
-    _lp.set(x,y,0);_ls.setScalar(taper);_lq.identity();_lm.compose(_lp,_lq,_ls);R.body.setMatrixAt(n,_lm);
-    // dorsal spines along the top of each hump: they ripple as it moves
-    const dy=A*Math.PI/lam*Math.cos(Math.PI*u/lam),nx=-dy,ny=1,nl=Math.hypot(nx,ny);
-    const len=taper*(0.9+0.45*Math.sin(t*9+i*0.8));_lp.set(x+nx/nl*taper*0.95,y+ny/nl*taper*0.95,0);
-    _le.set(0,0,Math.atan2(-nx,ny));_lq.setFromEuler(_le);_ls.set(taper*0.9,len,taper*0.9);_lm.compose(_lp,_lq,_ls);R.spines.setMatrixAt(n,_lm);n++;}
-  R.body.count=n;R.spines.count=n;R.body.instanceMatrix.needsUpdate=true;R.spines.instanceMatrix.needsUpdate=true;
-  return n;
+function poseLev(C,d){
+  const R=levRig,U=LEV.U;R.g.position.set(C.x,0,C.z+LEV.D);
+  const uj=LEV.lam*0.5-d;                       // where the back of the skull sits on the path
+  const th=Math.atan(levDY(uj)),c=Math.cos(th),s=Math.sin(th);
+  const jx=6.2*U,jy=-0.8*U;                      // that point, in the head's own coordinates
+  const px=LEV.Xd+uj,py=levY(uj);
+  R.head.rotation.z=th;R.head.position.set(px-(jx*c-jy*s),py-(jx*s+jy*c),0);
+  R.head.visible=py>-LEV.r0*1.6;
+  let n=0,m=0;
+  for(let i=0;i<LEV.N;i++){
+    const u=uj+10+i*LEV.gap,r=lerp(LEV.r0,LEV.r1,i/(LEV.N-1)),y=levY(u);
+    if(y<-r)continue;
+    _lp.set(LEV.Xd+u,y,0);_ls.setScalar(r);_lq.identity();_lm.compose(_lp,_lq,_ls);R.body.setMatrixAt(n++,_lm);
+    // a ridge of spines along the top: they lift and settle as it moves, like scales catching the light
+    const dy=levDY(u),nl=Math.hypot(dy,1),nx=-dy/nl,ny=1/nl;
+    for(const o of[0,0.5]){const len=r*(0.75+0.4*Math.sin(t*7+i*0.9+o*3));const ax=LEV.Xd+u+o*LEV.gap+nx*r*0.92,ay=levY(u+o*LEV.gap)+ny*r*0.92;
+      _lp.set(ax,ay,0);_le.set(0,0,Math.atan2(-nx,ny)+0.35);_lq.setFromEuler(_le);_ls.set(r*0.7,len,r*0.7);_lm.compose(_lp,_lq,_ls);R.spines.setMatrixAt(m++,_lm);}}
+  R.body.count=n;R.spines.count=m;R.body.instanceMatrix.needsUpdate=true;R.spines.instanceMatrix.needsUpdate=true;
+  // where the eye is right now, in world space
+  return new V3(R.head.position.x+C.x,R.head.position.y,C.z+LEV.D);
 }
 
 // ---- villagers: plain clothes, alive until the turn
@@ -3172,16 +3202,16 @@ function broodAI(e,dt){
   const [tg,d]=nearestTeam(e);if(!tg){animBrood(e,dt,0);return;}
   if(!e.aggro&&d<ENEMY.brood.aggro)e.aggro=true;
   let mv=0;
-  if(e.lungeT>0){e.lungeT-=dt;e.pos.x+=e.lx*11*dt;e.pos.z+=e.lz*11*dt;mv=1;
+  if(e.lungeT>0){e.lungeT-=dt;e.pos.x+=e.lx*8*dt;e.pos.z+=e.lz*8*dt;mv=1;
     if(!e.bit&&Math.hypot(tg.pos.x-e.pos.x,tg.pos.z-e.pos.z)<e.reach){e.bit=true;tg.hurt(e.dmg,e.pos);sfx.bite();}}
   else if(e.aggro){
     const ox=e.pos.x,oz=e.pos.z;
-    if(d<3.2&&e.cd<=0&&los(e.pos.x,e.pos.z,tg.pos.x,tg.pos.z)){e.cd=e.rate+rand(0,0.6);e.lungeT=0.28;e.bit=false;e.lx=(tg.pos.x-e.pos.x)/d;e.lz=(tg.pos.z-e.pos.z)/d;sfx.slither();}
+    if(d<3.2&&e.cd<=0&&los(e.pos.x,e.pos.z,tg.pos.x,tg.pos.z)){e.cd=e.rate+rand(0,0.6);e.lungeT=0.36;e.bit=false;e.lx=(tg.pos.x-e.pos.x)/d;e.lz=(tg.pos.z-e.pos.z)/d;sfx.slither();}
     else if(d>1.2){const [mx,mz]=stepToward(e,tg,d,e.speed*(Math.sin(e.ph*3)*0.25+1),dt);mv=1;face(e.obj,mx||tg.pos.x-e.pos.x,mz||tg.pos.z-e.pos.z,dt,9);}
     // never more than a few strides from the water: hold at the edge and hiss
     if(shoreDAt(e.pos.x,e.pos.z)>5){e.pos.x=ox;e.pos.z=oz;mv=0.3;face(e.obj,tg.pos.x-e.pos.x,tg.pos.z-e.pos.z,dt,6);}
   }
-  separate(e);collide(e.pos,e.r);
+  separate(e);collide(e.pos,e.r,true);
   animBrood(e,dt,mv);
 }
 function animBrood(e,dt,mv){
@@ -3340,52 +3370,77 @@ function makeShip(len,grey){
   for(let i=0;i<10;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:i%2?0xff7a2a:0xffc060,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));s.position.set(rand(-len*0.06,len*0.06),len*rand(0.05,0.2),rand(-len*0.3,len*0.3));s.scale.setScalar(len*rand(0.12,0.25));fire.add(s);}
   g.userData={fire,len};return g;
 }
+const MTN_O={x:80,z:-820};
 function buildFleet(){
   const g=new THREE.Group();g.position.set(FX,0,0);scene.add(g);
   const ships=[];
   const ours=makeShip(70,0x4a4e52);g.add(ours);
-  for(const [x,z,len] of [[-70,-160,60],[60,-250,75],[-30,-380,55],[90,-430,65],[-120,-300,50],[20,-520,80],[150,-120,45]]){const s=makeShip(len,0x3e4246);s.position.set(x,0,z);s.rotation.y=rand(-0.05,0.05);g.add(s);ships.push({g:s,x,z,dead:0});}
-  // the mountain: rock with fire in its cracks, trailing flame
-  const mtn=new THREE.Group();g.add(mtn);
-  const rock=new THREE.Mesh(new THREE.IcosahedronGeometry(42,1),new THREE.MeshPhongMaterial({color:0x2a1a14,emissive:0x5a1406,flatShading:true}));mtn.add(rock);
-  const trail=[];for(let i=0;i<40;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:i%3?0xff6a1a:0xffd080,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));s.scale.setScalar(rand(40,110));mtn.add(s);trail.push({s,o:rand(0,1)});}
-  const flash=new THREE.PointLight(0xff8040,0,2400,1);g.add(flash);
-  const red=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({color:0x7a0a06,transparent:true,opacity:0.85,depthWrite:false}));red.rotation.x=-Math.PI/2;red.position.set(30,-0.2,-650);red.renderOrder=1;g.add(red);
-  const steam=[];for(let i=0;i<26;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:0x9a8a84,transparent:true,opacity:0,depthWrite:false}));s.position.set(30+rand(-40,40),0,-650+rand(-40,40));g.add(s);steam.push({s,v:rand(30,80),d:rand(0,0.4)});}
-  const wave=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,64,1,true),new THREE.MeshBasicMaterial({color:0x2a0604,side:THREE.DoubleSide}));wave.position.set(30,0,-650);g.add(wave);
-  const crest=new THREE.Mesh(new THREE.TorusGeometry(1,0.008,4,64),new THREE.MeshBasicMaterial({color:0x9a7a74}));crest.rotation.x=Math.PI/2;crest.position.set(30,0,-650);g.add(crest);
+  for(const [x,z,len] of [[-70,-160,60],[60,-250,75],[-30,-380,55],[110,-430,65],[-120,-300,50],[20,-540,80],[150,-120,45],[-200,-480,55]]){const s=makeShip(len,0x3e4246);s.position.set(x,0,z);s.rotation.y=rand(-0.05,0.05);g.add(s);ships.push({g:s,x,z,dead:0});}
+  // the coast ahead: Lofoten standing out of the sea, black against the last of the night
+  const coast=new THREE.Group();g.add(coast);const cm=new THREE.MeshPhongMaterial({color:0x14161a,flatShading:true}),sn=new THREE.MeshPhongMaterial({color:0x4a4e56,flatShading:true});
+  for(let i=0;i<22;i++){const x=-1100+i*100+rand(-40,40);if(Math.abs(x-MTN_O.x)<160)continue;const h=rand(160,380),r=rand(90,170),z=rand(-1150,-980);
+    const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,5),cm);m.position.set(x,h/2-6,z);m.rotation.y=rand(0,TAU);coast.add(m);
+    const c=new THREE.Mesh(new THREE.ConeGeometry(r*0.3,h*0.28,5),sn);c.position.set(x,h-6-h*0.14,z);c.rotation.y=m.rotation.y;coast.add(c);}
+  // the mountain that burns: fire running down its gullies, then the whole of it goes into the sea
+  const mtn=new THREE.Group();mtn.position.set(MTN_O.x,0,MTN_O.z);g.add(mtn);
+  const rock=new THREE.Mesh(new THREE.ConeGeometry(190,330,7),new THREE.MeshPhongMaterial({color:0x1e1410,emissive:0x2a0804,flatShading:true}));rock.position.y=160;mtn.add(rock);
+  const lava=new THREE.MeshBasicMaterial({color:0xff6a1a,fog:false});
+  for(let i=0;i<9;i++){const a=i/9*TAU+rand(-0.2,0.2),l=rand(140,260),seam=new THREE.Mesh(box(rand(5,10),l,2),lava);
+    const k=rand(0.15,0.55);seam.position.set(Math.sin(a)*190*(1-k-0.12),330*k+l*0.15,Math.cos(a)*190*(1-k-0.12));seam.lookAt(0,330,0);seam.rotateX(Math.PI/2);mtn.add(seam);}
+  const fires=[];for(let i=0;i<46;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:i%3?0xff6a1a:0xffc060,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    const a=rand(0,TAU),k=rand(0.05,0.85);s.position.set(Math.sin(a)*190*(1-k)*1.02,330*k,Math.cos(a)*190*(1-k)*1.02);s.scale.setScalar(rand(40,110));mtn.add(s);fires.push({s,b:s.scale.x,ph:rand(0,6)});}
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:0xff4a10,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));halo.scale.setScalar(900);halo.position.y=200;mtn.add(halo);
+  const flash=new THREE.PointLight(0xff8040,0,2600,1);flash.position.set(MTN_O.x,120,MTN_O.z+150);g.add(flash);
+  const red=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({color:0x7a0a06,transparent:true,opacity:0.85,depthWrite:false}));red.rotation.x=-Math.PI/2;red.position.set(MTN_O.x,-0.2,MTN_O.z+120);red.renderOrder=1;g.add(red);
+  const steam=[];for(let i=0;i<30;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:0x9a8a84,transparent:true,opacity:0,depthWrite:false}));s.position.set(MTN_O.x+rand(-200,200),0,MTN_O.z+rand(60,200));g.add(s);steam.push({s,v:rand(30,80),d:rand(0,0.4)});}
+  const wave=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,64,1,true),new THREE.MeshBasicMaterial({color:0x2a0604,side:THREE.DoubleSide}));wave.position.set(MTN_O.x,0,MTN_O.z+120);g.add(wave);
+  const crest=new THREE.Mesh(new THREE.TorusGeometry(1,0.008,4,64),new THREE.MeshBasicMaterial({color:0x9a7a74}));crest.rotation.x=Math.PI/2;crest.position.set(MTN_O.x,0,MTN_O.z+120);g.add(crest);
   const deckLight=new THREE.PointLight(0xffd8a8,1.4,22,1.5);deckLight.position.set(0,6.5,-4);ours.add(deckLight);
-  fleet={g,ours,ships,mtn,rock,trail,flash,red,steam,wave,crest};poseFleet(0,0,0,0);g.visible=false;
+  fleet={g,ours,ships,mtn,fires,halo,flash,red,steam,wave,crest};poseFleet(0,0,0,0);g.visible=false;
 }
-// fall: 0..1 the mountain's descent; spread: radius of the red; waveR: shockwave radius; steamK: steam column 0..1
-function poseFleet(fall,spread,waveR,steamK){
-  const F=fleet;const p0=new V3(-120,900,-1200),p1=new V3(30,-30,-650);F.mtn.position.lerpVectors(p0,p1,fall);F.mtn.visible=fall<1;F.rock.rotation.set(t*0.3,t*0.2,0);
-  const dir=new V3().subVectors(p0,p1).normalize();F.trail.forEach(({s,o},i)=>{const k=((t*0.8+o)%1);s.position.copy(dir).multiplyScalar(30+k*420);s.material.opacity=(1-k)*0.9;});
+// slide: 0..1 the mountain tipping and sliding into the sea; spread: radius of the red; waveR: shockwave radius; steamK: steam 0..1
+function poseFleet(slide,spread,waveR,steamK){
+  const F=fleet,e=ss(slide);
+  F.mtn.position.set(MTN_O.x+40*e,-420*Math.pow(e,1.6),MTN_O.z+180*e);F.mtn.rotation.set(0.5*e,0,-0.12*e);F.mtn.visible=slide<1;
+  F.fires.forEach(f=>{f.s.scale.setScalar(f.b*(0.8+0.35*Math.sin(t*5+f.ph)));});F.halo.material.opacity=0.35+0.15*Math.sin(t*2.2);
+  const cx=MTN_O.x,cz=MTN_O.z+120;
   F.red.scale.setScalar(Math.max(0.01,spread));F.red.visible=spread>0.5;
-  F.steam.forEach(st=>{const k=clamp(steamK-st.d,0,1);st.s.position.y=k*st.v*4;st.s.scale.setScalar(40+k*160);st.s.material.opacity=k>0?0.5*(1-k*0.6):0;});
-  F.wave.visible=F.crest.visible=waveR>1;F.wave.scale.set(waveR,lerp(4,28,clamp(waveR/200,0,1)),waveR);F.wave.position.y=F.wave.scale.y/2-2;F.crest.scale.setScalar(waveR);F.crest.position.y=F.wave.scale.y-2;
-  for(const s of F.ships){const d=Math.hypot(s.x-30,s.z+650),hitByRed=spread>d,hitByWave=waveR>d;
-    s.g.userData.fire.visible=hitByRed&&d<520;
+  F.steam.forEach(st=>{const k=clamp(steamK-st.d,0,1);st.s.position.y=k*st.v*4;st.s.scale.setScalar(60+k*200);st.s.material.opacity=k>0?0.5*(1-k*0.6):0;});
+  F.wave.visible=F.crest.visible=waveR>1;F.wave.scale.set(waveR,lerp(6,34,clamp(waveR/200,0,1)),waveR);F.wave.position.y=F.wave.scale.y/2-2;F.crest.scale.setScalar(waveR);F.crest.position.y=F.wave.scale.y-2;
+  for(const s of F.ships){const d=Math.hypot(s.x-cx,s.z-cz),hitByRed=spread>d,hitByWave=waveR>d;
+    s.g.userData.fire.visible=hitByRed&&d<640;
     if(hitByWave){s.dead=Math.min(1,s.dead+0.02);s.g.rotation.z=s.dead*1.6;s.g.position.y=-s.dead*s.g.userData.len*0.3;}
     else{s.g.rotation.z=Math.sin(t*0.6+s.x)*0.03;s.g.position.y=Math.sin(t*0.8+s.z)*0.4;}}
   F.ours.rotation.z=Math.sin(t*0.6)*0.025;F.ours.position.y=Math.sin(t*0.8)*0.3;
 }
+// first person: you are on the deck, the others are in front of you
+const EYE={x:0,y:3.35,z:-26};
 function fleetStage(){
-  fleet.g.visible=true;baseFar=1400;
-  const deck=[[0,-6],[-1.4,-7.5],[1.3,-8],[0.2,-10]],P=[player,...roster];
-  P.forEach((x,i)=>{const d=deck[i]||[0,-12];x.obj.visible=true;x.obj.position.set(FX+d[0],1.75,d[1]);x.obj.rotation.y=Math.PI;});
+  fleet.g.visible=true;baseFar=1500;player.obj.visible=false;
+  const spots=[[-1.4,-28.6,2.6],[1.3,-29.4,-2.7],[0.1,-32,Math.PI]];
+  roster.forEach((a,i)=>{const d=spots[i]||[0,-13,Math.PI];a.obj.visible=true;a.obj.position.set(FX+d[0],1.75,d[1]);a.obj.rotation.y=d[2];a.obj.userData.headYawT=undefined;});
+  m2.fpYaw=0;m2.fpPitch=0;
 }
-const FP=(x,y,z)=>camAt(FX+x[0],x[1],x[2],FX+y[0],y[1],y[2]);
 function shipBob(){return Math.sin(t*0.8)*0.3;}
+// look from the eye toward a yaw/pitch; small sway so it feels held, not mounted
+function FPV(yaw,pitch,sh){const y=EYE.y+shipBob()+Math.sin(t*1.7)*0.03,s=sh||0;camera.position.set(FX+EYE.x+rand(-s,s),y+rand(-s,s),EYE.z+rand(-s,s));
+  camera.rotation.set(pitch+Math.sin(t*0.9)*0.008+rand(-s,s)*0.02,yaw+Math.sin(t*0.6)*0.01,Math.sin(t*0.6)*0.02);}
+const yawTo=(x,z)=>Math.atan2(-(FX+x-(FX+EYE.x)),-(z-EYE.z));
+const pitchTo=(x,y,z)=>Math.atan2(y-EYE.y,Math.hypot(x-EYE.x,z-EYE.z));
 const M2_FLEET=[
-  {d:7,text:'VESTFJORDEN · 04:40',on:()=>{fleetStage();m2.dawn=0.06;m2.wrong=0;$('fade').style.opacity=0;},cam:k=>{m2Sky(0.06,0);scene.fog.near=200;scene.fog.far=1100;poseFleet(0,0,0,0);FP([lerp(70,55,k),6+shipBob(),lerp(40,10,k)],[-20,8,-260],[0,0,0]);}},
-  {d:8,who:'CMDR. VALE',text:'Horsemen. The fleet runs you north past Lofoten. Rest while you can. That is an order.',on:()=>sfx.radio(),cam:k=>{m2Sky(0.07,0);poseFleet(0,0,0,0);FP([1.8,5.6+shipBob(),lerp(4,2,k)],[0,4.5,-80]);}},
-  {d:6,who:'SCAR',text:'…Commander. Something is coming down through the cloud.',cam:k=>{m2Sky(0.08,0);poseFleet(ss(k)*0.45,0,0,0);const m=fleet.mtn.position;FP([-2.5,5+shipBob(),-4],[m.x,m.y,m.z]);}},
-  {d:7,text:'A great mountain, burning with fire, is cast into the sea.',on:()=>{m2.boomed=false;},cam:k=>{const f=0.45+ss(k/0.5)*0.55;poseFleet(f,k>0.5?(k-0.5)*400:0,0,k>0.5?(k-0.5)*2:0);fleet.flash.position.set(30,60,-650);fleet.flash.intensity=k>0.5?Math.max(0,3-(k-0.5)*5):0;
-    m2Sky(0.08+(k>0.5?0.25*Math.max(0,1-(k-0.5)*3):0),0);if(k>0.5&&!m2.boomed){m2.boomed=true;sfx.blast();}FP([3,6+shipBob(),-14],[20,30,-600]);}},
-  {d:6,text:'The sea goes red outward from where it fell. A third of the ships are already burning.',cam:k=>{m2Sky(0.1,0);fleet.flash.intensity=0;poseFleet(1,200+k*380,0,1+k*0.5);FP([-6,7+shipBob(),-20],[40,4,-420]);}},
-  {d:6,who:'NIKON',text:'Brace! BRACE!',on:()=>{sfx.rumble();},cam:k=>{m2Sky(0.1,0);poseFleet(1,600,lerp(60,660,ss(k)),1.5);const sh=k*0.6;FP([1+rand(-sh,sh),3.6+shipBob()+rand(-sh,sh),-2],[10,6,-300]);}},
-  {d:2.5,text:'',on:()=>{sfx.blast();$('fade').style.opacity=1;},cam:k=>{FP([1,3.6,-2],[10,6,-300]);}}
+  {d:7,text:'VESTFJORDEN · 04:40',on:()=>{fleetStage();m2.dawn=0.06;m2.wrong=0;$('fade').style.opacity=0;},cam:k=>{m2Sky(0.06,0);scene.fog.near=260;scene.fog.far=1300;poseFleet(0,0,0,0);
+    FPV(lerp(0.9,0.25,ss(k)),lerp(-0.05,0.02,k));}},
+  {d:8,who:'CMDR. VALE',text:'Horsemen. The fleet runs you north past Lofoten. Rest while you can. That is an order.',on:()=>sfx.radio(),cam:k=>{m2Sky(0.07,0);poseFleet(0,0,0,0);
+    roster.forEach((a,i)=>{if(i<2)a.obj.userData.talkT=0;});FPV(lerp(0.25,-0.05,ss(k)),-0.12);}},
+  {d:7,who:'SCAR',text:'…Commander. That mountain. It’s on fire.',on:()=>{const s=roster.find(a=>a.name==='SCAR');if(s)s.obj.rotation.y=Math.PI*0.95;},cam:k=>{m2Sky(0.08,0);poseFleet(0,0,0,0);
+    const ty=yawTo(MTN_O.x,MTN_O.z),tp=pitchTo(MTN_O.x,140,MTN_O.z);FPV(lerp(-0.05,ty,ss(k*1.4)),lerp(-0.12,tp,ss(k*1.4)));}},
+  {d:8,text:'A great mountain, burning with fire, is cast into the sea.',on:()=>{m2.boomed=false;sfx.rumble();},cam:k=>{const sl=clamp((k-0.08)/0.62,0,1);poseFleet(sl,k>0.62?(k-0.62)*500:0,0,k>0.55?(k-0.55)*2.2:0);
+    fleet.flash.intensity=k>0.6?Math.max(0,3-(k-0.6)*7):0;m2Sky(0.08+(k>0.6?0.22*Math.max(0,1-(k-0.6)*3):0),0);if(k>0.6&&!m2.boomed){m2.boomed=true;sfx.blast();}
+    const ty=yawTo(MTN_O.x,MTN_O.z),tp=pitchTo(MTN_O.x,lerp(140,40,ss(k)),MTN_O.z);FPV(ty,tp,k>0.6?0.15*(1-k):0.02);}},
+  {d:6,text:'The sea goes red outward from where it went in. A third of the ships are already burning.',cam:k=>{m2Sky(0.1,0);fleet.flash.intensity=0;poseFleet(1,220+k*420,0,1+k*0.5);
+    FPV(lerp(yawTo(MTN_O.x,MTN_O.z),0.05,ss(k)),lerp(0.02,-0.02,k));}},
+  {d:6,who:'NIKON',text:'Brace! BRACE!',on:()=>{sfx.rumble();const n=roster.find(a=>a.name==='NIKON');if(n)n.obj.rotation.y=0;},cam:k=>{m2Sky(0.1,0);poseFleet(1,640,lerp(80,900,ss(k)),1.5);FPV(0.08,lerp(0,0.1,k),k*0.5);}},
+  {d:2.5,text:'',on:()=>{sfx.blast();$('fade').style.opacity=1;},cam:k=>{FPV(0.08,0.1,0.3);}}
 ];
 // the wake: lying on the shore at the head of Kirkefjorden as the sun comes up
 const WAKE={x:88.75,z:108.75};
@@ -3393,23 +3448,23 @@ function placeSquad2(){for(const a of roster){if(a.joined||!a.home)continue;a.po
 function wakeStage(){
   if(fleet)fleet.g.visible=false;baseFar=760;placeSquad2();
   player.obj.visible=false;roster.forEach(a=>{if(!a.joined)a.obj.visible=true;});
-  eye.position.set(WAKE.x-30,95,WAKE.z+298);eye.rotation.set(0,Math.PI,0);eye.scale.setScalar(1.4);eyeOpen=1;skyBlot=1;
-  levRig.g.visible=true;poseLev(WAKE,0,0);
+  levRig.g.visible=true;const ep=poseLev(WAKE,0);m2.eyeP=ep;
+  eye.position.set(ep.x,ep.y,ep.z-2);eye.rotation.set(0,Math.PI,0);eye.scale.setScalar(0.8);eyeOpen=1;skyBlot=1;
 }
 const WK=(px,py,pz,tx,ty,tz,roll)=>{camAt(px,py,pz,tx,ty,tz);if(roll)camera.rotateZ(roll);};
 const M2_WAKE=[
   {d:5,text:'KIRKEFJORDEN · LOFOTEN',on:()=>{wakeStage();$('fade').style.opacity=1;},cam:k=>{m2.dawn=0.16;m2Sky(0.16,0);scene.fog.near=140;scene.fog.far=700;$('fade').style.opacity=1-ss(k)*0.75;
-    WK(WAKE.x,0.32,WAKE.z,WAKE.x-30,90,WAKE.z+300,1.1);}},
+    const E=m2.eyeP;WK(WAKE.x,0.32,WAKE.z,E.x,E.y-10,E.z,1.1);}},
   {d:7,text:'The tide is warm. It is the colour of a wound.',cam:k=>{$('fade').style.opacity=0.25*(1-k);m2.dawn=lerp(0.16,0.32,k);m2Sky(m2.dawn,0);
-    WK(WAKE.x,lerp(0.32,1.15,ss(k)),WAKE.z,WAKE.x+lerp(6,-20,ss(k)),lerp(-2,40,ss(k)),WAKE.z+lerp(18,300,ss(k)),lerp(1.1,0.18,ss(k)));}},
+    const E=m2.eyeP;WK(WAKE.x,lerp(0.32,1.15,ss(k)),WAKE.z,lerp(WAKE.x+6,E.x+40,ss(k)),lerp(-2,E.y-40,ss(k)),lerp(WAKE.z+18,E.z,ss(k)),lerp(1.1,0.18,ss(k)));}},
   {d:7,text:'As the light comes up, the eye closes.',cam:k=>{$('fade').style.opacity=0;m2.dawn=lerp(0.32,0.5,k);m2Sky(m2.dawn,0);eyeOpen=1-ss((k-0.25)/0.55);
-    WK(WAKE.x,lerp(1.15,1.6,ss(k)),WAKE.z,WAKE.x-30,lerp(40,70,ss(k)),WAKE.z+300,lerp(0.18,0,ss(k)));}},
+    const E=m2.eyeP;WK(WAKE.x,lerp(1.15,1.6,ss(k)),WAKE.z,E.x+40,lerp(E.y-40,E.y-20,ss(k)),E.z,lerp(0.18,0,ss(k)));}},
   {d:13,text:'Something the size of the horizon turns, and goes back under the sea.',on:()=>{eyeOpen=0;skyBlot=0;sfx.rumble();m2.rb=0;},cam:k=>{m2.dawn=lerp(0.5,0.68,k);m2Sky(m2.dawn,0);
-    const tau=Math.max(0,(k-0.22)*13);poseLev(WAKE,clamp(k/0.4,0,1),tau);{const n=Math.floor(k*13/4.2);if(n>m2.rb){m2.rb=n;sfx.rumble();}}
-    const sh=0.05+Math.sin(k*Math.PI)*0.12;WK(WAKE.x+rand(-sh,sh),1.6+rand(-sh,sh),WAKE.z,WAKE.x-45,18,WAKE.z+300);}},
+    const tau=Math.max(0,k*13-1.2);poseLev(WAKE,25*tau+7*tau*tau);{const n=Math.floor(k*13/4.2);if(n>m2.rb){m2.rb=n;sfx.rumble();}}
+    const sh=0.05+Math.sin(k*Math.PI)*0.12;WK(WAKE.x+rand(-sh,sh),1.6+rand(-sh,sh),WAKE.z,WAKE.x-10,lerp(m2.eyeP.y-15,32,ss(k*2)),WAKE.z+300);}},
   {d:9,who:'CMDR. VALE',text:'Horsemen, respond… The fleet is gone. If anyone hears this: find your people and get to Bunes beach, north over the ridge. It’s the only flat ground I can land on.',
     on:()=>{levRig.g.visible=false;sfx.radio();},cam:k=>{m2.dawn=lerp(0.68,0.72,k);m2Sky(m2.dawn,0);const e2=ss(k);
-    WK(WAKE.x,1.6,WAKE.z,WAKE.x+lerp(-45,-6,e2),lerp(18,3,e2),WAKE.z+lerp(300,-60,e2));}}
+    WK(WAKE.x,1.6,WAKE.z,WAKE.x+lerp(-10,-6,e2),lerp(32,3,e2),WAKE.z+lerp(300,-60,e2));}}
 ];
 // the landing on Bunes
 const LZ={x:52,z:28};
@@ -3435,7 +3490,7 @@ NOTES.push(
   {t:'OLSEN KITCHEN',b:'Lars went down to the water at five. He says the fjord is singing. He wants me to come and listen with him. I have locked the door and I am not opening it for anyone.',c:'B. OLSEN'},
   {t:'NOTICE ON THE CHAPEL DOOR',b:'Services suspended. The bell will not be rung. If you hear the bell ring, do not come.',c:'THE PARISH'}
 );
-CONT.tackle={d:0.32,h:0.35,cols:[],lbl:'OPEN',rotItem:Math.PI/2,build(g,M){hollow(g,M.olive,0.62,0.22,0.32,0);const p=new THREE.Group();p.position.set(0,0.22,-0.16);g.add(p);mk(box(0.64,0.04,0.34),M.olive,0,0.02,0.16,p);mk(box(0.12,0.03,0.04),M.handle,0,0.05,0.33,p);
+CONT.tackle={d:0.32,h:0.35,cols:[],lbl:'OPEN',rotItem:Math.PI/2,build(g,M){const tm=M.tackleM||(M.tackleM=new THREE.MeshPhongMaterial({color:0x2a3428,flatShading:true,shininess:6}));hollow(g,tm,0.62,0.22,0.32,0);const p=new THREE.Group();p.position.set(0,0.22,-0.16);g.add(p);mk(box(0.64,0.04,0.34),tm,0,0.02,0.16,p);mk(box(0.12,0.03,0.04),M.handle,0,0.05,0.33,p);
   return {anim:k=>{p.rotation.x=-k*1.7;},slot:g,y:0.03,sc:0.5,sx:0.2};}};
 function addNote2(idx,x,z){const g=new THREE.Group();g.position.set(x,0,z);mk(box(0.5,0.4,0.4),new THREE.MeshPhongMaterial({map:texCrate}),0,0.2,0,g);
   const scr=mk(box(0.3,0.01,0.4),BASIC(0xc9a24a),0,0.41,0,g);scr.rotation.y=0.3;scene.add(g);notes.push({g,scr,idx,x,z});}
@@ -3454,7 +3509,9 @@ function buildFurniture2(){
   C('crate',18,87,{items:['a']});C('crate',28,95,{rot:0.4,cash:['m2_vindstad',150]});C('crate',24,97,{rot:-0.3,items:['h']});
   // secrets: under the fishing bench at the end of the dock, and behind the boulder in the inlet
   P('bench',25.5,104.6,{rot:0});C('tackle',25.5,104.7,{rot:0,items:[J_]});
+  C('tackle',25.0,99.8,{rot:0.5,fl:'Hooks and lead sinkers. A tin of snus, empty.'});C('tackle',26.1,103.4,{rot:-0.4,cash:['m2_dock',60],fl:'A knife, a whetstone, a roll of kroner wrapped in tape.'});C('crate',25.1,102.2,{rot:0.2,items:['a']});C('tackle',26.3,98.4,{rot:1.2,fl:'Tangled line. Somebody cut it in a hurry.'});
   C('crate',4,69,{rot:0.4,items:[Y_]});
+  {const nm=L(0x2a2e24),g=new THREE.Group();g.position.set(tw(25.5),0,tw(104.6)+0.24);scene.add(g);const d=mk(box(1.5,0.42,0.03),nm,0,0.24,0,g);d.rotation.x=0.12;for(let i=0;i<4;i++)mk(sph(0.06,5,4),L(0xc8501a),-0.6+i*0.4,0.45,0.02,g);_batch.push(...staticMeshes(g,true));}
   bakeFurniture();
   addNote2(NOTES.length-3,tw(36),tw(45.6));addNote2(NOTES.length-2,tw(16),tw(50.3));addNote2(NOTES.length-1,tw(22.5),tw(89.6));
 }
