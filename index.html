@@ -558,12 +558,13 @@ function buildSets(){
   heli.userData={rotor,trot,nav,beam};heli.visible=false;scene.add(heli);
 }
 let hail=null,ridgeFire=null,hailOn=false,fireOn=0,hailHiss=0;
+let smoke=[],smokeT=0;const SMOKE_DARK=new THREE.Color(0x4a3c36),SMOKE_LIT=new THREE.Color(0x9a4a22);
 let fireLight=null,horizonGlow=null,serpent=null,fireFog=null;const FIRE_FOG=new THREE.Color(0x140402);
 function buildWeather(){
   const N=520,pos=new Float32Array(N*6);hail={N,pos,v:new Float32Array(N)};
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
   hail.m=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0xe8b4aa,transparent:true,opacity:0.55,fog:false,depthWrite:false}));
-  hail.m.frustumCulled=false;hail.m.visible=false;scene.add(hail.m);
+  hail.m.frustumCulled=false;hail.m.visible=false;hail.m.renderOrder=5;scene.add(hail.m);
   for(let i=0;i<N;i++){hail.v[i]=rand(18,26);pos[i*6+1]=-99;}
   // a low ridge north of the yard, and the line of fire that runs along it
   const ridge=new THREE.Group();scene.add(ridge);const rM=new THREE.MeshPhongMaterial({color:0x0c0c0d,flatShading:true});
@@ -574,7 +575,9 @@ function buildWeather(){
   const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(fp),3));
   const col=new Float32Array(fp.length);fg.setAttribute('color',new THREE.BufferAttribute(col,3));
   ridgeFire=new THREE.Points(fg,new THREE.PointsMaterial({size:2.6,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-  ridgeFire.userData.base=fp.slice();ridgeFire.userData.reach=fp.map((_,i)=>i%3===0?(fp[i]+20)/154:0);ridgeFire.visible=false;scene.add(ridgeFire);
+  ridgeFire.userData.base=fp.slice();ridgeFire.userData.reach=fp.map((_,i)=>i%3===0?(fp[i]+20)/154:0);ridgeFire.visible=false;ridgeFire.renderOrder=5;scene.add(ridgeFire);
+  // smoke off the burning treeline: soft puffs that rise slowly and drift with the hail
+  for(let i=0;i<70;i++){const m=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:0x1e1816,transparent:true,opacity:0,depthWrite:false,fog:false}));m.renderOrder=5;m.visible=false;scene.add(m);smoke.push({m,life:0,max:1,vx:0,vy:0,s:1});}
   // the burning treeline: bare trunks along the ridge, black against the flames
   const trM=new THREE.MeshBasicMaterial({color:0x050302});
   for(let i=0;i<fp.length;i+=15){const h=rand(2.5,4.5),tr=new THREE.Mesh(new THREE.ConeGeometry(rand(0.4,0.8),h,4),trM);tr.position.set(fp[i],fp[i+1]+h/2-0.4,fp[i+2]);ridge.add(tr);}
@@ -610,6 +613,15 @@ function updateWeather(dt){
     if(fireOn>0){const col=ridgeFire.geometry.attributes.color.array,pp=ridgeFire.geometry.attributes.position.array,b=ridgeFire.userData.base,r=ridgeFire.userData.reach;
       for(let i=0;i<col.length;i+=3){const lit=fireOn>r[i]?1:0,f=lit*(0.55+0.45*Math.random());col[i]=f;col[i+1]=f*rand(0.25,0.5);col[i+2]=f*0.08;pp[i+1]=b[i+1]+lit*Math.random()*0.5;}
       ridgeFire.geometry.attributes.color.needsUpdate=true;ridgeFire.geometry.attributes.position.needsUpdate=true;}}
+  if(smoke.length){const on=fireOn>0&&hailOn;
+    if(on){smokeT-=dt;const b=ridgeFire.userData.base,rc=ridgeFire.userData.reach;
+      while(smokeT<=0){smokeT+=1/6;const p=smoke.find(q=>q.life<=0);if(!p)break;
+        let j=-1;for(let n=0;n<20;n++){const c=(Math.random()*(b.length/3)|0)*3;if(fireOn>rc[c]){j=c;break;}}if(j<0)break;
+        p.m.position.set(b[j]+rand(-1,1),b[j+1]+1,b[j+2]);p.life=p.max=rand(9,14);p.vx=rand(0.5,1.2);p.vy=rand(1.2,2.0);p.s=rand(5,8);}}
+    for(const p of smoke){if(p.life<=0||!fireOn){p.life=0;p.m.visible=false;continue;}
+      p.life-=dt;const a=1-p.life/p.max;p.m.visible=true;
+      p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt*(1-a*0.4);const sc=p.s*(1+a*2.5);p.m.scale.set(sc,sc,1);
+      p.m.material.opacity=Math.min(1,a*5)*(1-a)*0.55;p.m.material.color.copy(SMOKE_DARK).lerp(SMOKE_LIT,Math.max(0,1-a*3)*0.8);}}
   if(serpent){const r=clamp(fireOn,0,1),on=r>0,rv=clamp((r-0.2)/0.8,0,1),fl=0.85+0.15*Math.sin(t*7.3)*Math.sin(t*3.1);
     horizonGlow.visible=on;serpent.visible=on&&eyeOpen>0.5;
     horizonGlow.material.opacity=r*0.15*fl;serpent.userData.halo.material.opacity=rv*0.2*fl;
