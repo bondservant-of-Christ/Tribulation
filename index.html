@@ -112,6 +112,10 @@ blockquote cite{display:block;font-style:normal;font-family:var(--mono);font-siz
 #dmgDir i{position:absolute;left:28%;right:28%;top:0;height:22px;border-top:5px solid var(--blood);border-radius:50% 50% 0 0;filter:drop-shadow(0 0 6px var(--blood))}
 body.noCursor #c{cursor:none}
 .sens{display:grid;gap:10px;max-width:420px}
+.setp{margin:0;max-width:460px;font-size:17px;line-height:1.35;color:var(--bone);opacity:.8}
+#setMsg{color:var(--brass);opacity:1;min-height:1em}
+.ghost.danger{border-color:var(--blood);color:var(--blood)}
+.ghost.danger.armed{background:var(--blood);color:var(--void)}
 .sens label{display:grid;grid-template-columns:150px 1fr 44px;gap:12px;align-items:center;font-size:18px;letter-spacing:.1em}
 .sens input{accent-color:var(--blood);width:100%;min-width:0}
 .sens output{color:var(--brass);font-variant-numeric:tabular-nums;text-align:right}
@@ -196,7 +200,7 @@ body.noCursor #c{cursor:none}
     <div class="eyebrow">THE HORSEMEN · NORWAY, 2077</div>
     <h1>Tribu&shy;lation</h1>
     <blockquote>Eleven days ago the drill at Site 9 stopped. Three days ago the mine stopped answering. Tonight the stars over the ridge started going out.</blockquote>
-    <button class="cta" id="toMissions">MISSIONS</button>
+    <div class="row"><button class="cta" id="toMissions">MISSIONS</button><button class="ghost" id="toSettings">SETTINGS</button></div>
     <div class="controls">
       <span>Left thumb: move · Drag the right side: look</span>
       <span>Hold AIM to raise. Sidearms fire when you let go, and a steady hold hits harder. Automatics fire while held.</span>
@@ -219,6 +223,21 @@ body.noCursor #c{cursor:none}
     <div class="lbl">ARMORY · HIDDEN WEAPONS FOUND</div>
     <div class="armory" id="armory"></div>
     <button class="ghost" id="backTitle">BACK</button>
+  </div>
+</div>
+
+<div class="overlay" id="settings" hidden>
+  <div class="panel">
+    <div class="eyebrow">NORDKAPP COMMAND · RECORDS</div>
+    <h2>Settings</h2>
+    <div class="lbl">GAME VERSION</div>
+    <p class="setp">If a new scene or fix isn't showing up, refresh the game. Your saves are kept.</p>
+    <button class="ghost" id="updBtn">REFRESH GAME</button>
+    <div class="lbl">SAVED DATA</div>
+    <p class="setp">Wipes found weapons, the eye, one-time dialogue and look sensitivity. The game starts over as if new. This can't be undone.</p>
+    <button class="ghost danger" id="resetBtn">RESET ALL DATA</button>
+    <p class="setp" id="setMsg"></p>
+    <button class="ghost" id="setBack">BACK</button>
   </div>
 </div>
 
@@ -2262,6 +2281,18 @@ function togglePause(){
 $('toMissions').onclick=()=>{initAudio();showMissions();};
 $('cineSkip').onclick=()=>{if(cine){if(cine.onEnd!==missionComplete)skyBlot=0.32;endCine();}};
 $('cine').addEventListener('pointerdown',e=>{if(e.target.closest('button')||!cine)return;if(cine.shown<cine.full.length)cine.shown=cine.full.length;else nextShot();});
+async function clearAppCache(){
+  try{if('caches' in window){for(const k of await caches.keys())await caches.delete(k);}}catch(e){}
+  try{if(navigator.serviceWorker){for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();}}catch(e){}
+}
+function reloadFresh(){const u=new URL(location.href);u.searchParams.set('r',Date.now());location.replace(u.toString());}
+$('toSettings').onclick=()=>{$('title').hidden=true;$('settings').hidden=false;$('setMsg').textContent='';$('resetBtn').classList.remove('armed');$('resetBtn').textContent='RESET ALL DATA';};
+$('setBack').onclick=()=>{$('settings').hidden=true;$('title').hidden=false;};
+$('updBtn').onclick=async()=>{$('setMsg').textContent='Refreshing\u2026';await clearAppCache();reloadFresh();};
+$('resetBtn').onclick=async()=>{const b=$('resetBtn');
+  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='TAP AGAIN TO CONFIRM';$('setMsg').textContent='Everything saved will be erased.';setTimeout(()=>{b.classList.remove('armed');b.textContent='RESET ALL DATA';},4000);return;}
+  try{Object.keys(localStorage).filter(k=>k.startsWith('tribulation.')).forEach(k=>localStorage.removeItem(k));}catch(e){}
+  $('setMsg').textContent='Data erased. Restarting\u2026';await clearAppCache();reloadFresh();};
 $('backTitle').onclick=()=>{$('missions').hidden=true;$('title').hidden=false;state='title';};
 $('m1').onclick=startMission;$('retryBtn').onclick=startMission;
 $('overMenu').onclick=showMissions;$('winMenu').onclick=showMissions;
