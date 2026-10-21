@@ -3379,7 +3379,7 @@ function poseLev(C,d){
 const VILLAGERS=[
   {n:'INGRID',x:25,y:38,c:0x2a3a5a,l:['The path to Bunes came down in the night. The whole slope. Nobody gets to the beach now.','Harald in Vindstad blasts rock for the road. If anyone has charges, it’s him.']},
   {n:'TORE',x:34,y:39.5,c:0x5a3a22,l:['You came out of the water. Everyone else who came out of the water stayed down.','The boats went out to the fleet at first light. None of them came back.']},
-  {n:'MARIT',x:22,y:48,c:0x6a2a20,l:['One of yours ran into the Olsen house. Something followed him in. Wolves, I think. I hope wolves.','The Olsen house. The one with the green door. Over there.']},
+  {n:'MARIT',x:22,y:48,c:0x6a2a20,l:['One of yours ran into the Olsen house. Something followed him in. Wolves, I think. I hope wolves.','The Olsen house. The big one up against the mountain. Over there.']},
   {n:'BJØRN',x:17,y:56.5,c:0x3a3a4a,l:['Don’t look at the water too long. It looks back.']},
   {n:'EINAR',x:31,y:58,trade:1,c:0x3a4a3a,l:['The fish came up dead at first light. All of them. Then the seals.','Bandages and rounds, if you have kroner. Forty a bundle.']},
   {n:'SOLVEIG',x:27,y:68,c:0x4a4a5a,l:['There’s a woman down in the surf by the point. Breathing. I couldn’t make myself go down there.','The water touches you, down there. I won’t.']},
@@ -3927,7 +3927,7 @@ function updateSquad2(dt){
   for(const a of roster){if(a.joined||a.dead)continue;const u=a.obj.userData,d=Math.hypot(player.pos.x-a.pos.x,player.pos.z-a.pos.z);
     if(a.spot==='olsen'){
       face(a.obj,tw(18)-a.pos.x,tw(51)-a.pos.z,dt,6);animHuman(a.obj,dt,0,1,-1);
-      if(!a.callOut&&d<18){a.callOut=true;radio(['NIKON','In here! The house with the green door! They’re right outside it!']);}
+      if(!a.callOut&&d<18){a.callOut=true;radio(['NIKON','In here! The big house up against the mountain! They’re right outside the door!']);}
       const threat=enemies.some(e=>e.alive&&e.type==='wolf'&&Math.hypot(e.pos.x-a.pos.x,e.pos.z-a.pos.z)<15);
       if(!threat&&d<4.5)joinAlly(a,['NIKON','Took you long enough. They’ve been at that door since sunrise. Where are the others?']);
     }else if(a.spot==='surf'){
