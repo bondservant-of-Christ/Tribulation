@@ -1379,6 +1379,227 @@ function animHuman(o,dt,move,aimT,reload){
       ik(a,_T,u.zombie?(a.sd>0?POLE_R:POLE_L):(a.sd>0?POLE_RF:POLE_LF));
     }
   }
+  if(u.kit)kitStep(o,dt,move,aimT,reload);
+}
+
+// ================= HORSEMEN KIT (rev B): identity marks, cloth & hair, sling, weapon light, brass, reload, signals, downed =================
+// Layered on top of makeOperator/animHuman: animHuman runs as before, then kitStep adjusts the pose and steps the physics.
+// Everything that lives in world space (cloth, sling, brass, mags, breath, blood) sits in one fx group per Horseman.
+const KITS=[];
+const _kw=new V3(),_kw2=new V3(),_kq=new THREE.Quaternion(),_kUp=new V3(0,1,0);
+class Verlet{
+  constructor(n){this.p=[];for(let i=0;i<n;i++)this.p.push({x:new V3(),o:new V3(),pin:null});this.c=[];this.spheres=[];this.damp=0.985;this.wind=new V3(0.15,0,-0.1);}
+  link(a,b,len){this.c.push([a,b,len]);}
+  step(dt){
+    dt=Math.min(dt,1/30);const g=-9.8*dt*dt;
+    for(const p of this.p){if(p.pin){p.pin(_kw);p.o.copy(p.x);p.x.copy(_kw);continue;}
+      _kw.subVectors(p.x,p.o).multiplyScalar(this.damp);p.o.copy(p.x);p.x.add(_kw);p.x.y+=g;p.x.addScaledVector(this.wind,dt*dt*(0.5+Math.random()));}
+    for(let it=0;it<3;it++){
+      for(const [a,b,len] of this.c){const A=this.p[a],B=this.p[b];_kw.subVectors(B.x,A.x);const d=_kw.length()||1e-6,df=(d-len)/d;
+        if(A.pin&&B.pin)continue;if(A.pin)B.x.addScaledVector(_kw,-df);else if(B.pin)A.x.addScaledVector(_kw,df);else{A.x.addScaledVector(_kw,df*0.5);B.x.addScaledVector(_kw,-df*0.5);}}
+      for(const p of this.p){if(p.pin)continue;for(const s of this.spheres){_kw.subVectors(p.x,s.c);const d=_kw.length();if(d<s.r)p.x.addScaledVector(_kw,(s.r-d)/(d||1e-6));}if(p.x.y<0.02)p.x.y=0.02;}
+    }
+  }
+  // after a teleport or a long gap, put everything back on its pins
+  snap(drop){for(let i=0;i<this.p.length;i++){const p=this.p[i];if(p.pin)p.pin(p.x);else{const q=this.p[this.top?this.top[i]:0];p.x.copy(q.x);p.x.y-=drop[i]||0;}p.o.copy(p.x);}}
+}
+function kitCloth(fx,bone,anchors,H,len,mat,spheres,ragged){
+  const W=anchors.length,V=new Verlet(W*H);V.spheres=spheres;const idx=(i,j)=>j*W+i;V.top=[];const drop=[];
+  for(let i=0;i<W;i++){const a=anchors[i];V.p[idx(i,0)].pin=out=>out.copy(a).applyMatrix4(bone.matrixWorld);}
+  const seg=anchors.map((_,i)=>len*(ragged?ragged(i):1)/(H-1));
+  for(let j=0;j<H;j++)for(let i=0;i<W;i++){V.top[idx(i,j)]=idx(i,0);drop[idx(i,j)]=j*seg[i];if(j>0)V.link(idx(i,j-1),idx(i,j),seg[i]);if(i>0)V.link(idx(i-1,j),idx(i,j),anchors[i].distanceTo(anchors[i-1])*(1+j*0.04));}
+  for(let j=1;j<H;j++)for(let i=1;i<W;i++)V.link(idx(i-1,j-1),idx(i,j),Math.hypot(anchors[i].distanceTo(anchors[i-1]),seg[i]));
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(W*H*3),3));
+  const ix=[];for(let j=0;j<H-1;j++)for(let i=0;i<W-1;i++){const a=idx(i,j),b=idx(i+1,j),c=idx(i,j+1),d=idx(i+1,j+1);ix.push(a,c,b,b,c,d);}geo.setIndex(ix);
+  const mesh=new THREE.Mesh(geo,mat);mesh.castShadow=true;mesh.frustumCulled=false;fx.add(mesh);
+  return {V,snap(){V.snap(drop);},update(dt){V.step(dt);const P=geo.attributes.position.array;V.p.forEach((p,k)=>{P[k*3]=p.x.x;P[k*3+1]=p.x.y;P[k*3+2]=p.x.z;});geo.attributes.position.needsUpdate=true;}};
+}
+function kitStrand(fx,pins,n,len,w,mat,spheres,endMesh){
+  const V=new Verlet(n);V.spheres=spheres;V.damp=0.97;V.p[0].pin=pins[0];if(pins[1])V.p[n-1].pin=pins[1];V.top=V.p.map(()=>0);
+  for(let i=1;i<n;i++)V.link(i-1,i,len);
+  const segs=[];for(let i=0;i<n-1;i++){const m=new THREE.Mesh(box(w,1,w*0.4),mat);m.castShadow=true;fx.add(m);segs.push(m);}
+  if(endMesh)fx.add(endMesh);
+  return {V,segs,snap(){V.snap(V.p.map((_,i)=>i*len));},
+    update(dt){V.step(dt);for(let i=0;i<n-1;i++){const a=V.p[i].x,b=V.p[i+1].x,m=segs[i];_kw.subVectors(b,a);const l=_kw.length()||1e-4;m.position.copy(a).addScaledVector(_kw,0.5);m.scale.set(1,l,1);m.quaternion.setFromUnitVectors(_kUp,_kw.divideScalar(l));}
+      if(endMesh){endMesh.position.copy(V.p[n-1].x);endMesh.rotation.y+=dt*0.8;}}};
+}
+function kitLoose(fx,obj,bounce){fx.add(obj);obj.visible=false;return {obj,v:new V3(),w:new V3(),life:0,bounce:bounce||0.35,floor:0.012};}
+function kitLooseStep(L,dt){if(L.life<=0){L.obj.visible=false;return;}L.life-=dt;L.obj.visible=true;L.v.y-=9.8*dt;L.obj.position.addScaledVector(L.v,dt);L.obj.rotation.x+=L.w.x*dt;L.obj.rotation.y+=L.w.y*dt;L.obj.rotation.z+=L.w.z*dt;
+  if(L.obj.position.y<L.floor){L.obj.position.y=L.floor;if(Math.abs(L.v.y)>0.4){L.v.y=-L.v.y*L.bounce;L.v.x*=0.6;L.v.z*=0.6;L.w.multiplyScalar(0.5);}else{L.v.set(0,0,0);L.w.set(0,0,0);if(L.flat){L.obj.quaternion.slerp(L.flat,Math.min(1,dt*8));}}}}
+const kitSprite=(c,s,add)=>{const m=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:c,transparent:true,opacity:0,blending:add?THREE.AdditiveBlending:THREE.NormalBlending,depthWrite:false}));m.scale.setScalar(s);return m;};
+
+function kitAdd(o,def){
+  const u=o.userData,F=def.body==='f',g=u.guns.long,fx=new THREE.Group();scene.add(fx);
+  const K={o,fx,cloth:[],strands:[],t:Math.random()*10,downT:0,downNow:false,snapped:false};u.kit=K;KITS.push(K);
+  const hel=u.head.children.find(c=>c.type==='Group');
+  const white=new THREE.MeshPhongMaterial({color:0xcfc8bc,flatShading:true,shininess:6}),gold=new THREE.MeshPhongMaterial({color:0xb08a3a,emissive:0x1a1004,flatShading:true,shininess:40,specular:0x6a5a2a});
+  // body collision spheres, refreshed from the bones every frame
+  const sp=[{b:u.upper,l:new V3(0,0.34,0),r:F?0.18:0.21},{b:u.upper,l:new V3(0,0.4,-0.22),r:F?0.12:0.14},{b:u.hips,l:new V3(0,-0.02,0),r:F?0.2:0.22},
+    ...u.legs.flatMap(lg=>[{b:lg.thigh,l:new V3(0,-0.2,0),r:0.12},{b:lg.shin,l:new V3(0,-0.2,0),r:0.09}]),{b:u.head,l:new V3(0,0.12,0),r:0.15}];
+  sp.forEach(s=>s.c=new V3());K.spheres=sp;
+  // marks of the rider (Revelation 6)
+  if(def.mark==='white'){
+    // a crown band on the helmet, a bow sigil on the left shoulder plate
+    mk(new THREE.TorusGeometry(0.128,0.008,3,16,Math.PI*1.2),white,0,0.085,0.02,hel).rotation.set(Math.PI/2+0.25,0,Math.PI*0.9);
+    const pl=u.arms.find(a=>a.sd<0).up;const bw=mk(new THREE.TorusGeometry(0.045,0.006,3,10,Math.PI),white,-0.075,0.035,0,pl);bw.rotation.set(Math.PI/2,0,Math.PI/2-0.45);mk(box(0.003,0.003,0.09),white,-0.075,0.04,0,pl).rotation.z=-0.45;
+  }else if(def.mark==='black'){
+    // the balances: a brass scale charm off the vest, and a black shawl
+    const ch=new THREE.Group();mk(box(0.07,0.004,0.004),gold,0,0,0,ch);for(const sd of[-1,1])mk(new THREE.CylinderGeometry(0.014,0.002,0.008,6),gold,sd*0.035,-0.03,0,ch);mk(box(0.003,0.03,0.003),gold,0,0.012,0,ch);
+    K.strands.push(kitStrand(fx,[out=>out.set(-0.08,0.48,0.16).applyMatrix4(u.upper.matrixWorld)],4,0.035,0.004,gold,[sp[0]],ch));
+    const an=[];for(let i=0;i<6;i++){const a=(i/5-0.5)*2.2;an.push(new V3(Math.sin(a)*0.14,0.64,-Math.cos(a)*0.12-0.02));}
+    K.cloth.push(kitCloth(fx,u.upper,an,6,0.42,new THREE.MeshPhongMaterial({color:0x0e0e10,flatShading:true,side:THREE.DoubleSide,shininess:3}),sp,i=>[0.8,1,1.15,1.1,0.95,0.75][i]));
+    // her own hair, same pieces, hung from the scalp so each one swings
+    K.hair=[];const pieces=[];u.head.children.forEach(m=>{if(m.isMesh&&m.material.color&&m.material.color.getHex()===0xcfcfd2)pieces.push(m);});
+    for(const m of pieces){const hh=((m.geometry.parameters&&m.geometry.parameters.height)||0.32)/2;
+      const top=new V3(0,hh,0).applyEuler(m.rotation).add(m.position);
+      const piv=new THREE.Group();piv.position.copy(top);u.head.add(piv);u.head.remove(m);piv.add(m);m.position.set(0,0,0).sub(new V3(0,hh,0).applyEuler(m.rotation));
+      K.hair.push({piv,ax:0,az:0,vx:0,vz:0,prev:null,pv:new V3(),back:top.z<-0.05});}
+  }else if(def.mark==='red'){
+    // a red slash across the visor
+    mk(box(0.2,0.012,0.006),BASIC(0xff2a1a,{fog:false}),0,0.03,0.142,hel).rotation.z=0.25;
+  }
+  // sling between the front swivel and the stock
+  K.sling=kitStrand(fx,[out=>out.set(-0.03,-0.03,0.5).applyMatrix4(g.matrixWorld),out=>out.set(-0.03,-0.04,-0.28).applyMatrix4(g.matrixWorld)],9,0.1,0.02,L(0x1a1b1c),[sp[0],sp[2]]);K.strands.push(K.sling);
+  // weapon light: a lit lens (no beam mesh, it reads as a grey disc in first person; no real light, to keep phones fast)
+  const lens=mk(cyl(0.018,0.018,0.05,8),L(0x111214),0.035,0,0.62,g);lens.rotation.x=Math.PI/2;
+  const ls=kitSprite(0xffe8c0,0.09,true);ls.material.opacity=0.9;ls.position.set(0.035,0,0.65);g.add(ls);
+  // visor glow, muzzle bloom, smoke, breath
+  K.vg=kitSprite(def.glow||0xd8302a,0.16,true);K.vg.position.set(-0.04,0.025,0.15);hel.add(K.vg);
+  K.flash=kitSprite(0xffc070,0.5,true);K.flash.position.set(0,0.005,0.92);g.add(K.flash);K.flashT=0;
+  K.smoke=[];for(let i=0;i<6;i++){const s=kitSprite(0x8a8682,0.1,false);fx.add(s);K.smoke.push({s,life:0,v:new V3()});}
+  K.breath=[];for(let i=0;i<4;i++){const s=kitSprite(0x9a9aa4,0.1,false);fx.add(s);K.breath.push({s,life:0,v:new V3()});}K.brT=Math.random();
+  // the magazine as its own piece, plus brass and a spare body for the dropped one
+  g.traverse(m=>{if(m.isMesh&&m.geometry.parameters&&Math.abs(m.geometry.parameters.height-0.13)<1e-4&&Math.abs(m.geometry.parameters.width-0.034)<1e-4)K.gunMag=m;});
+  const magGeo=box(0.034,0.13,0.06),magM=L(0x1b1d20);
+  K.handMag=mk(magGeo,magM,0,0,0);K.handMag.visible=false;fx.add(K.handMag);
+  K.dropMag=kitLoose(fx,mk(magGeo,magM,0,0,0),0.3);
+  const brassM=new THREE.MeshPhongMaterial({color:0xc9a24a,emissive:0x2a1a04,shininess:60});
+  K.brass=[];for(let i=0;i<8;i++)K.brass.push(kitLoose(fx,mk(cyl(0.006,0.006,0.03,5),brassM,0,0,0),0.4));
+  K.blood=new THREE.Mesh(new THREE.CircleGeometry(1,14),new THREE.MeshBasicMaterial({color:0x4a0604,transparent:true,opacity:0.85,depthWrite:false}));K.blood.rotation.x=-Math.PI/2;K.blood.position.y=0.006;K.blood.visible=false;fx.add(K.blood);
+  return K;
+}
+function kitRemove(o){const K=o&&o.userData.kit;if(!K)return;scene.remove(K.fx);const i=KITS.indexOf(K);if(i>=0)KITS.splice(i,1);}
+// keep each fx group in step with its Horseman: hidden with them, removed with them
+function kitSync(){for(const K of KITS){K.fx.visible=K.o.visible&&!!K.o.parent;}}
+function kitFire(o){
+  const K=o.userData.kit;if(!K)return;const g=o.userData.guns.long;if(!g||!g.visible)return;
+  K.flashT=0.05;K.flash.material.opacity=1;K.flash.scale.setScalar(rand(0.35,0.6));K.flash.material.rotation=rand(0,TAU);
+  g.updateMatrixWorld(true);
+  const b=K.brass.find(b=>b.life<=0);if(b){b.obj.position.set(0.04,0.03,0.08).applyMatrix4(g.matrixWorld);b.v.set(1.6+rand(0,0.6),1.4+rand(0,0.6),rand(-0.4,0.2)).applyQuaternion(g.getWorldQuaternion(_kq));b.w.set(rand(-20,20),rand(-20,20),rand(-20,20));b.life=3;}
+  const s=K.smoke.find(s=>s.life<=0);if(s){s.s.position.set(0,0,0.95).applyMatrix4(g.matrixWorld);s.life=1;s.v.set(rand(-0.1,0.1),0.25,rand(-0.1,0.1));}
+}
+const _kRH=new V3(),_kLH=new V3(),_kT=new V3(),_kA=new V3(),_kB=new V3();
+const kitGunPt=(g,x,y,z,out)=>out.set(x,y,z).applyQuaternion(g.quaternion).add(g.position);
+function kitArms(u){return u.arms[0].sd>0?[u.arms[0],u.arms[1]]:[u.arms[1],u.arms[0]];}
+function kitIK(u,g,lh){const [aR,aL]=kitArms(u);_kRH.copy(g.userData.rh).applyQuaternion(g.quaternion).add(g.position);ik(aR,_kRH,POLE_R);
+  if(lh)ik(aL,lh,POLE_L);else{_kLH.copy(g.userData.lh).applyQuaternion(g.quaternion).add(g.position);ik(aL,_kLH,POLE_L);}}
+const kss=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
+function kitStep(o,dt,move,aimT,reload){
+  const u=o.userData,K=u.kit,g=u.guns.long;if(K.posing)return;K.t+=dt;
+  const longOut=g&&u.gunType==='long'&&g.visible;
+  if(!K.downNow&&K.downT>0){ // back on their feet: pick the rifle up, clean up
+    K.downT=0;u.rig.rotation.z=0;u.rig.position.set(0,0,0);if(K.dropGun){K.dropGun.life=0;K.dropGun.obj.visible=false;}if(g)g.visible=u.gunType==='long';K.blood.visible=false;}
+  K.downNow=false;
+  if(longOut&&!u.zombie&&!K.posing){
+    const m=u.mS||0,run=clamp((m-0.55)/0.45,0,1),cb=u.carry||0;
+    // on the move: both hands on the rifle. Walking = low ready and scanning; running = rifle up, muzzle level
+    if(cb>0.02&&reload<0){
+      const scan=(1-run)*Math.sin(K.t*0.7)*0.4*cb;
+      _kA.set(0.03,0.31+Math.abs(Math.cos(u.p))*0.01,0.24);_kB.set(0.02,0.36+Math.abs(Math.cos(u.p))*0.02,0.2);
+      _kT.copy(_kA).lerp(_kB,run);g.position.lerp(_kT,cb);
+      const rx=THREE.MathUtils.lerp(0.42,-0.35,run),ry=THREE.MathUtils.lerp(-0.3+scan*0.5,-0.75,run),rz=THREE.MathUtils.lerp(0.1,-0.9,run);
+      g.rotation.set(THREE.MathUtils.lerp(g.rotation.x,rx,cb),THREE.MathUtils.lerp(g.rotation.y,ry,cb),THREE.MathUtils.lerp(g.rotation.z,rz,cb));
+      if(u.headYawT===undefined){u.upper.rotation.y+=scan*0.5;u.head.rotation.y+=scan*0.5;}
+      u.upper.rotation.x+=run*0.08*cb;u.head.rotation.x-=run*0.08*cb;
+      kitIK(u,g);
+    }
+    // firing: the shoulder takes the kick
+    if(u.recoil>0&&reload<0){u.upper.rotation.x-=u.recoil*0.04;u.upper.rotation.y+=u.recoil*0.03;g.position.z-=u.recoil*0.02;kitIK(u,g);}
+    // reload: drop the empty, pull a fresh one from the chest rig, seat it, slap it, rack the handle
+    if(reload>=0){
+      const p=clamp(reload,0,1);
+      const mag0=kitGunPt(g,0,-0.1,0.12,new V3()),magLow=kitGunPt(g,0,-0.2,0.12,new V3()),pouch=new V3(-0.04,0.36,0.21),
+        ch0=kitGunPt(g,-0.035,0.06,-0.02,new V3()),ch1=kitGunPt(g,-0.035,0.06,-0.16,new V3()),hg=kitGunPt(g,g.userData.lh.x,g.userData.lh.y,g.userData.lh.z,new V3());
+      const sg=(a,b)=>kss((p-a)/(b-a));let held=null;
+      if(p<0.12)_kT.copy(hg).lerp(mag0,sg(0,0.12));
+      else if(p<0.2){_kT.copy(mag0).lerp(magLow,sg(0.12,0.2));held=1;}
+      else if(p<0.45){_kT.copy(magLow).lerp(pouch,sg(0.22,0.45));if(p>0.4)held=1;}
+      else if(p<0.58){_kT.copy(pouch).lerp(magLow,sg(0.45,0.58));held=1;}
+      else if(p<0.64){_kT.copy(magLow).lerp(mag0,sg(0.58,0.64));held=1;}
+      else if(p<0.7)_kT.copy(mag0).lerp(magLow,Math.sin(sg(0.64,0.7)*Math.PI)*0.25);
+      else if(p<0.78)_kT.copy(mag0).lerp(ch0,sg(0.7,0.78));
+      else if(p<0.86)_kT.copy(ch0).lerp(ch1,sg(0.78,0.84));
+      else _kT.copy(ch1).lerp(hg,sg(0.86,1));
+      if(p>0.6&&p<0.66)g.position.y+=Math.sin((p-0.6)/0.06*Math.PI)*0.012;
+      kitIK(u,g,_kT);
+      if(K.gunMag)K.gunMag.visible=p<0.12||p>=0.64;
+      K.handMag.visible=!!held;
+      if(held){o.updateMatrixWorld(true);const hand=kitArms(u)[1].fore.children.find(c=>c.type==='Group');K.handMag.position.set(0,-0.08,0.02).applyMatrix4(hand.matrixWorld);K.handMag.quaternion.copy(g.getWorldQuaternion(_kq));}
+      if(p>=0.2&&!K.dropped){K.dropped=true;const D=K.dropMag;D.obj.position.copy(K.handMag.position);D.obj.quaternion.copy(K.handMag.quaternion);D.v.set(rand(-0.3,0.3),-0.4,0.2);D.w.set(rand(-6,6),rand(-3,3),rand(-6,6));D.life=2.5;}
+      if(p<0.1)K.dropped=false;
+    }else{if(K.gunMag)K.gunMag.visible=true;K.handMag.visible=false;K.dropped=false;}
+    // hand signals: some idle fidgets become "hold" (fist up) then "move up" (chop forward), looking back at the squad
+    if(u.fid&&u.fid.t<=dt&&u.fid.type!=='signal'&&Math.random()<0.3){u.fid.type='signal';u.fid.d=3.0;}
+    if(u.fid&&u.fid.type==='signal'){
+      const T=u.fid.t;u.head.rotation.y+=(Math.min(1,T*3)*Math.min(1,(3-T)*3))*0.9;
+      const rest=kitGunPt(g,g.userData.lh.x,g.userData.lh.y,g.userData.lh.z,new V3()),fist=_kA.set(-0.3,0.86,0.06),c0=new V3(-0.2,0.8,0.18),c1=new V3(-0.12,0.6,0.6);
+      if(T<0.35)_kT.copy(rest).lerp(fist,kss(T/0.35));else if(T<1.4)_kT.copy(fist);else if(T<2.5)_kT.copy(c0).lerp(c1,Math.sin(((T-1.4)/0.55%1)*Math.PI));else _kT.copy(c0).lerp(rest,kss((T-2.5)/0.5));
+      kitIK(u,g,_kT);
+    }
+  }
+  kitPhysics(o,dt);
+}
+// downed / dead: stagger, knee buckles, rifle falls, collapse on the side, hand on the wound, blood spreads
+function kitDown(o,dt,dead){
+  const u=o.userData,K=u.kit,g=u.guns.long;
+  K.posing=true;animHuman(o,dt,0,0,-1);K.posing=false;
+  K.downNow=true;K.downT+=dt;const T=K.downT;
+  u.rig.rotation.x=0;u.rig.position.set(0,0,0);
+  const [l0,l1]=u.legs;
+  if(T<0.55){u.flinch=1;const f=Math.sin(T/0.55*Math.PI);u.rig.rotation.x=-f*0.22;u.rig.position.z=-f*0.18;}
+  else if(T<1.3){const q=kss((T-0.55)/0.75);u.hips.position.y=0.95-q*0.42;l0.thigh.rotation.x=-1.25*q;l0.shin.rotation.x=1.45*q;l1.thigh.rotation.x=0.1+0.9*q;l1.shin.rotation.x=1.9*q;l1.foot.rotation.x=0.4*q;
+    u.upper.position.y=u.hips.position.y+0.03;u.upper.rotation.x=0.35*q;u.head.rotation.x=0.3*q;if(T>0.9)kitDropRifle(o);}
+  else{const q=kss((T-1.3)/0.8);u.hips.position.y=0.53-q*0.38;l0.thigh.rotation.x=-1.25+q;l0.shin.rotation.x=1.45-q*0.9;l1.thigh.rotation.x=1-q*0.6;l1.shin.rotation.x=1.9-q*1.4;
+    u.upper.position.y=u.hips.position.y+0.03;u.rig.rotation.z=q*1.38;u.rig.position.x=-q*0.12;u.rig.position.y=q*0.06;
+    const br=dead?0:Math.sin(K.t*4.5)*0.04*q;u.upper.rotation.x=0.35*(1-q)+0.15*q+br;u.head.rotation.x=0.3-q*0.5+(dead?0:Math.sin(K.t*0.7)*0.06*q);u.head.rotation.z=-0.4*q;
+    kitDropRifle(o);
+    const [aR,aL]=kitArms(u);
+    ik(aL,_kA.set(-0.02,0.08,0.18),POLE_L);ik(aR,_kB.set(0.38+(dead?0:Math.sin(K.t*1.3)*0.04*q),-0.05,0.2+0.15*q),POLE_R);
+    K.blood.visible=true;o.updateMatrixWorld(true);_kw2.set(0,0.1,0).applyMatrix4(u.hips.matrixWorld);K.blood.position.x=_kw2.x;K.blood.position.z=_kw2.z;K.blood.scale.setScalar(0.05+kss((T-1.8)/3)*0.45);}
+  if(dead&&K.vg)K.vg.material.opacity=0;
+  kitPhysics(o,dt,dead);
+}
+function kitDropRifle(o){
+  const u=o.userData,K=u.kit,g=u.guns.long;if(!g||!g.visible)return;o.updateMatrixWorld(true);
+  if(!K.dropGun){const c=g.clone(true);c.traverse(m=>{if(m.isSprite||(m.material&&m.material.blending===THREE.AdditiveBlending))m.visible=false;});K.dropGun=kitLoose(K.fx,c,0.25);K.dropGun.floor=0.05;}
+  const D=K.dropGun;g.getWorldPosition(D.obj.position);g.getWorldQuaternion(D.obj.quaternion);D.v.set(0.4,0.2,0.5).applyQuaternion(o.quaternion);D.w.set(rand(-2,2),rand(-1,1),2.5);D.life=1e9;D.flat=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,o.rotation.y+rand(-0.6,0.6),Math.PI/2));g.visible=false;
+}
+const _hqk=new THREE.Quaternion(),_hpk=new V3(),_hvk=new V3(),_hdk=new V3();
+function kitPhysics(o,dt,dead){
+  const u=o.userData,K=u.kit;if(dt<=0)return;
+  o.updateMatrixWorld(true);
+  K.spheres.forEach(s=>s.c.copy(s.l).applyMatrix4(s.b.matrixWorld));
+  // first frame, or after a teleport: drop the cloth straight onto its pins instead of letting it whip across the map
+  _kw2.setFromMatrixPosition(o.matrixWorld);
+  if(!K.snapped||!K.last||K.last.distanceToSquared(_kw2)>4){K.snapped=true;K.cloth.forEach(c=>c.snap());K.strands.forEach(s=>s.snap());if(K.hair)K.hair.forEach(h=>h.prev=null);}
+  K.last=(K.last||new V3()).copy(_kw2);
+  const g=u.guns.long;K.sling.segs.forEach(m=>m.visible=!!(g&&g.visible&&u.gunType==='long'));
+  K.cloth.forEach(c=>c.update(dt));K.strands.forEach(s=>s.update(dt));
+  // Scar's hair: damped pendulums driven by gravity and the head's own acceleration, solved in head space
+  if(K.hair){u.head.getWorldQuaternion(_hqk).invert();
+    for(const h of K.hair){h.piv.getWorldPosition(_hpk);if(!h.prev){h.prev=_hpk.clone();h.pv.set(0,0,0);}
+      _hvk.subVectors(_hpk,h.prev).divideScalar(dt);const acc=_hdk.subVectors(_hvk,h.pv).divideScalar(dt);h.prev.copy(_hpk);h.pv.copy(_hvk);acc.clampLength(0,40);
+      _hdk.set(-acc.x*0.35,-9.8-acc.y*0.35,-acc.z*0.35).applyQuaternion(_hqk).normalize();
+      const tx=Math.atan2(-_hdk.z,-_hdk.y),tz=Math.atan2(_hdk.x,-_hdk.y),k=h.back?45:70,c=h.back?5:7;
+      h.vx+=((tx-h.ax)*k-h.vx*c)*dt;h.vz+=((tz-h.az)*k-h.vz*c)*dt;h.ax+=h.vx*dt;h.az+=h.vz*dt;
+      if(h.ax<-0.12){h.ax=-0.12;h.vx=Math.max(0,h.vx);}if(h.ax>1.1){h.ax=1.1;h.vx=Math.min(0,h.vx);}h.az=clamp(h.az,-0.9,0.9);h.piv.rotation.set(h.ax,0,h.az);}}
+  // muzzle bloom, smoke, brass, mags, the dropped rifle, breath in the cold, visor glow
+  if(K.flashT>0){K.flashT-=dt;if(K.flashT<=0)K.flash.material.opacity=0;}
+  K.smoke.forEach(s=>{if(s.life>0){s.life-=dt*0.8;s.s.position.addScaledVector(s.v,dt);s.s.scale.setScalar(0.08+(1-s.life)*0.5);s.s.material.opacity=Math.max(0,s.life)*0.25;}else s.s.material.opacity=0;});
+  K.brass.forEach(b=>kitLooseStep(b,dt));kitLooseStep(K.dropMag,dt);if(K.dropGun)kitLooseStep(K.dropGun,dt);
+  K.brT-=dt;if(K.brT<=0&&!dead&&!u.zombie){K.brT=(u.mS||0)>0.55?0.45:1.3;const b=K.breath.find(b=>b.life<=0);if(b){u.head.updateMatrixWorld(true);b.s.position.set(0,0.08,0.16).applyMatrix4(u.head.matrixWorld);b.life=1;b.v.set(0,0.15,0).add(_kw.set(0,0,0.2).applyQuaternion(u.head.getWorldQuaternion(_kq)));}}
+  K.breath.forEach(b=>{if(b.life>0){b.life-=dt*1.2;b.s.position.addScaledVector(b.v,dt);b.s.scale.setScalar(0.06+(1-b.life)*0.3);b.s.material.opacity=Math.max(0,b.life)*0.28;}else b.s.material.opacity=0;});
+  if(!dead)K.vg.material.opacity=u.zombie?0:(0.42+0.12*Math.sin(K.t*2.1)+(K.downNow&&K.downT>3.6&&Math.sin(K.t*11)>0.4?-0.3:0));
 }
 
 function trackMats(g){const mats=[];g.traverse(o=>{if(o.isMesh){o.castShadow=true;if(o.material&&o.material.emissive&&!mats.includes(o.material)){mats.push(o.material);o.material.userData.base=o.material.emissive.getHex();}}});return mats;}
@@ -1742,9 +1963,9 @@ let kills=0,shake=0,hurtT=0,t=0,missionT=0,stage=0,consoleHold=0,boss=null,secre
 let trail=[],aimT=0,aiming=false,lastAim=new V3(0,0,-1);
 const camTarget=new V3(),aimDir=new V3(0,0,-1);
 const ALLY_DEF=[
-  {name:'NIKON',call:'Nikon',armor:0x2e3032,armor2:0x161718,glow:0xd8302a,suit:0x1f2123},
-  {name:'SCAR',call:'Scar',armor:0x1e1f21,armor2:0x101112,glow:0xe0342c,body:'f',suit:0x18191b},
-  {name:'POLEMOS',call:'Polemos',armor:0x3a3c3f,armor2:0x1b1c1e,glow:0xc8281f,suit:0x232528}
+  {name:'NIKON',call:'Nikon',mark:'white',armor:0x2e3032,armor2:0x161718,glow:0xd8302a,suit:0x1f2123},
+  {name:'SCAR',call:'Scar',mark:'black',armor:0x1e1f21,armor2:0x101112,glow:0xe0342c,body:'f',suit:0x18191b},
+  {name:'POLEMOS',call:'Polemos',mark:'red',armor:0x3a3c3f,armor2:0x1b1c1e,glow:0xc8281f,suit:0x232528}
 ];
 const OBJ=['Get inside the facility','Restart the yard generator','Search the offices for the shaft key','Reach the shaft past the red door','Call the lift up','The lift is coming'];
 let laser;
@@ -1759,7 +1980,7 @@ function makePlayer(){
       if(this.hp<=0){this.hp=0;gameOver();}}};
 }
 function makeAlly(def){
-  const o=makeHuman({armor:def.armor,armor2:def.armor2,glow:def.glow,body:def.body,suit:def.suit,guns:['long']});scene.add(o);
+  const o=makeHuman({armor:def.armor,armor2:def.armor2,glow:def.glow,body:def.body,suit:def.suit,guns:['long']});scene.add(o);kitAdd(o,def);
   return {obj:o,pos:o.position,name:def.name,call:def.call,fem:def.body==='f',bleed:0,ffKnock:false,hp:100,max:100,cd:rand(0,.5),mag:20,reload:0,downed:false,revive:0,walk:0,
     hurt(d,src){if(this.downed)return;this.hp-=d;this.obj.userData.flinch=1;if(this.hp<=0){this.hp=0;this.downed=true;this.revive=0;this.bleed=BLEED;this.ffKnock=false;sfx.down();radio([this.name,'I\u2019m hit! Get me up!'],true);}}};
 }
@@ -2065,7 +2286,7 @@ function updateInteract(dt){
 }
 function clearWorld(){
   containers.forEach(c=>scene.remove(c.g));containers=[];solids=[];if(furnBatch){scene.remove(furnBatch);furnBatch.traverse(o=>{if(o.isMesh)o.geometry.dispose();});furnBatch=null;}closeNote();useTarget=null;
-  [player,...allies].forEach(e=>e&&scene.remove(e.obj));
+  [player,...allies].forEach(e=>{if(e){scene.remove(e.obj);kitRemove(e.obj);}});
   [...enemies.map(e=>e.obj),...bullets.map(b=>b.m),...orbs.map(o=>o.m),...pickups.map(p=>p.m),...pickups.filter(p=>p.glow).map(p=>p.glow),...parts.map(p=>p.m),...notes.map(n=>n.g)].forEach(o=>scene.remove(o));
   if(consoleObj)scene.remove(consoleObj);if(genObj)scene.remove(genObj);genObj=null;
   enemies=[];bullets=[];orbs=[];pickups=[];parts=[];notes=[];allies=[];
@@ -2459,9 +2680,9 @@ function update(dt){
   for(let i=0;i<allies.length;i++){const a=allies[i],u=a.obj.userData;
     if(a.flashT>0){a.flashT-=dt;if(a.flashT<=0)flashOf(a.obj).visible=false;}
     if(a.reload>0)a.reload-=dt;
-    if(a.dead){u.rig.rotation.x+=(-Math.PI/2-u.rig.rotation.x)*Math.min(1,8*dt);u.rig.position.y=0.22;continue;}
+    if(a.dead){if(u.kit)kitDown(a.obj,dt,true);else{u.rig.rotation.x+=(-Math.PI/2-u.rig.rotation.x)*Math.min(1,8*dt);u.rig.position.y=0.22;}continue;}
     if(a.downed){
-      u.rig.rotation.x+=(-Math.PI/2-u.rig.rotation.x)*Math.min(1,8*dt);u.rig.position.y=0.22;
+      if(u.kit)kitDown(a.obj,dt,false);else{u.rig.rotation.x+=(-Math.PI/2-u.rig.rotation.x)*Math.min(1,8*dt);u.rig.position.y=0.22;}
       const d=Math.hypot(a.pos.x-player.pos.x,a.pos.z-player.pos.z);
       if(d<2.2&&player.hp>0)a.revive+=dt;else{a.revive=Math.max(0,a.revive-dt*0.5);a.bleed-=dt;}
       if(a.revive>=2.4){a.downed=false;a.hp=50;a.revive=0;
@@ -2489,7 +2710,7 @@ function update(dt){
     a.cd-=dt;let tgt=null,bd=16*16;
     for(const e of enemies){if(!e.alive||!e.aggro||e.pos.y<-1)continue;const q=(e.pos.x-a.pos.x)**2+(e.pos.z-a.pos.z)**2;if(q<bd&&los(a.pos.x,a.pos.z,e.pos.x,e.pos.z)){bd=q;tgt=e;}}
     if(tgt){const ex=tgt.pos.x-a.pos.x,ez=tgt.pos.z-a.pos.z;face(a.obj,ex,ez,dt,10);
-      if(a.cd<=0&&a.reload<=0&&u.aimB>0.7){a.cd=rand(0.6,0.95);fire(a.pos,tmpV.set(ex,0,ez).normalize(),{pellets:1,spread:0.13,dmg:5,life:0.45},bulletMatA,'a');sfx.ally();flashOf(a.obj).visible=true;a.flashT=0.05;u.recoil=1;
+      if(a.cd<=0&&a.reload<=0&&u.aimB>0.7){a.cd=rand(0.6,0.95);fire(a.pos,tmpV.set(ex,0,ez).normalize(),{pellets:1,spread:0.13,dmg:5,life:0.45},bulletMatA,'a');sfx.ally();flashOf(a.obj).visible=true;a.flashT=0.05;u.recoil=1;kitFire(a.obj);
         if(--a.mag<=0){a.mag=20;a.reload=2.2;sfx.reload();}}}
     else if(settle&&a.hx!==undefined)face(a.obj,a.hx,a.hz,dt,mv>0.1?6:3);
     else if(mv>0.1)face(a.obj,dx,dz,dt,6);
@@ -3563,7 +3784,7 @@ function leaveM2(){
 }
 function clearM2(){
   npcs.forEach(n=>scene.remove(n.obj));npcs=[];
-  roster.forEach(a=>scene.remove(a.obj));
+  roster.forEach(a=>{scene.remove(a.obj);kitRemove(a.obj);});
   (m2.extra||[]).forEach(o=>scene.remove(o));m2.extra=[];
 }
 let humG=null;
@@ -3758,7 +3979,7 @@ function loop(){
   if(state==='play')update(dt);
   else if(state==='over')deathT=Math.min(1,deathT+dt*1.1);
   else if(state==='cine'){updateCine(dt);if(player){animHuman(player.obj,dt,0,0,-1);(mission===2?roster.filter(a=>a.joined||!a.spot||a.spot==='olsen'):allies).forEach(a=>animHuman(a.obj,dt,0,0,-1));}}
-  updateAmbient(dt);updateSets(dt);updateCamera(dt);
+  updateAmbient(dt);updateSets(dt);updateCamera(dt);kitSync();
   renderer.setRenderTarget(rt);renderer.render(scene,camera);
   if((state==='play'||state==='paused')&&player&&player.hp>0){renderer.autoClear=false;renderer.clearDepth();renderer.render(vmScene,vmCam);renderer.autoClear=true;}
   renderer.setRenderTarget(null);renderer.render(postScene,postCam);
