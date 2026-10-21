@@ -473,14 +473,15 @@ function updateStars(){
   const gt=canvasTex(16,16,(x,w,h)=>{x.fillStyle='#3a322c';x.fillRect(0,0,w,h);grime(x,w,h,60,.5);x.fillStyle='rgba(200,200,190,.15)';for(let i=0;i<14;i++)x.fillRect(Math.random()*16|0,Math.random()*16|0,1,1);},[150,150]);
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(420,420),new THREE.MeshPhongMaterial({shininess:4,specular:0x0a0a0a,map:gt}));
   ground.rotation.x=-Math.PI/2;ground.position.set(50,-0.07,37);scene.add(ground);m1Out.push(ground);
-  const bark=L(0x161210);
+  const bark=L(0x161210),outerTrees=new THREE.Group();
   for(let i=0;i<46;i++){
     let x,z;do{x=rand(-40,140);z=rand(-30,140);}while(x>-4&&x<104&&z>-4&&z<118);
     const t=new THREE.Group();t.position.set(x,0,z);const h=rand(5,11);
     mk(cyl(0.12,0.32,h,5),bark,0,h/2,0,t);
     for(let k=0;k<3;k++){const b=mk(cyl(0.05,0.08,rand(1.5,3),4),bark,0,h*rand(.5,.9),0,t);b.rotation.z=rand(-1.2,1.2);b.rotation.y=rand(0,TAU);}
-    scene.add(t);m1Out.push(t);
+    t.updateMatrix();for(const m of [...t.children]){m.applyMatrix4(t.matrix);outerTrees.add(m);}
   }
+  mergeDeep(outerTrees);scene.add(outerTrees);m1Out.push(outerTrees);   // 46 trees: one draw call, not 184
 })();
 const embers=(function(){const n=420,g=new THREE.BufferGeometry(),a=new Float32Array(n*3);
   for(let i=0;i<n;i++){a[i*3]=rand(-40,40);a[i*3+1]=rand(0,30);a[i*3+2]=rand(-40,40);}
@@ -493,7 +494,7 @@ const CR={x:300,z:300};
 const setLights=[new THREE.PointLight(0x9fb4c8,0,10,2),new THREE.PointLight(0xc42a24,0,9,2),new THREE.PointLight(0xffd8a0,0,26,1.4)];
 setLights.push(new THREE.PointLight(0xd8dde4,0,4.5,2));setLights.forEach(l=>scene.add(l));setLights[3].position.set(CR.x+0.7,2.0,CR.z-1.1);
 setLights[0].position.set(CR.x,2.2,CR.z-3.2);setLights[1].position.set(CR.x+1.5,3.0,CR.z+1.5);
-let vale=null,heli=null,heliState=null,monitors=[];
+let vale=null,heli=null,heliState=null,monitors=[],roomSet=null;
 function monCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const tx=new THREE.CanvasTexture(c);tx.magFilter=THREE.NearestFilter;tx.minFilter=THREE.NearestFilter;return {c,x:c.getContext('2d'),tx};}
 const MON_DRAW=[
   // waterfall: noise rows scrolling, one narrow carrier that will not go away
@@ -528,7 +529,7 @@ const MON_DRAW=[
 ];
 function buildSets(){
   // ---- command room
-  const room=new THREE.Group();room.position.set(CR.x,0,CR.z);scene.add(room);
+  const room=new THREE.Group();room.position.set(CR.x,0,CR.z);scene.add(room);roomSet=room;
   const wallM=new THREE.MeshPhongMaterial({color:0x1a1b1d,side:THREE.BackSide,flatShading:true,shininess:6});
   const shell=new THREE.Mesh(new THREE.BoxGeometry(10,3.4,9),wallM);shell.position.set(0,1.7,0.5);shell.receiveShadow=true;room.add(shell);
   const floorM=new THREE.MeshPhongMaterial({color:0x121314,map:texFloor,shininess:20,specular:0x222222});
@@ -548,7 +549,7 @@ function buildSets(){
   for(const sx of[-4.6,4.6])for(let i=0;i<4;i++)mk(box(0.02,0.04,0.3),BASIC(i%2?0xc42a24:0x5a5e60),sx*0.93,1.6,-2.5+i*1.4,room);
   for(let i=0;i<3;i++)mk(box(1.6,0.04,0.25),BASIC(0x2a2c30),(i-1)*3,3.36,0.5,room);
   // Commander Vale
-  vale=makeHuman({officer:true,armor:0x1b1c1e,armor2:0x101112,glow:0xd8302a,suit:0x1a1b1d,body:'f',guns:[]});
+  vale=makeHuman({officer:true,armor:0x1b1c1e,armor2:0x101112,glow:0xd8302a,suit:0x1a1b1d,body:'f',guns:[]});mergeDeep(vale);
   vale.position.set(CR.x,0,CR.z-2.3);vale.rotation.y=Math.PI;scene.add(vale);
   // ---- mountains ringing the valley
   const mtn=new THREE.Group();scene.add(mtn);m1Out.push(mtn);
@@ -558,6 +559,7 @@ function buildSets(){
     const x=50+Math.cos(a)*r,z=60+Math.sin(a)*r;
     const m1=new THREE.Mesh(new THREE.ConeGeometry(w,h,6+(i%3)),rockM);m1.position.set(x,h/2-2,z);m1.rotation.y=rand(0,TAU);mtn.add(m1);
     const m2=new THREE.Mesh(new THREE.ConeGeometry(w*0.38,h*0.38,6+(i%3)),snowM);m2.position.set(x,h-2-h*0.19+0.5,z);m2.rotation.y=m1.rotation.y;mtn.add(m2);}
+  mergeDeep(mtn);   // rock and snow: two draw calls for the whole ring
   // ---- the gunship
   heli=new THREE.Group();const hb=new THREE.Group();heli.add(hb);
   const hm=new THREE.MeshPhongMaterial({color:0x1d1f22,flatShading:true,shininess:20,specular:0x222222}),hd=new THREE.MeshPhongMaterial({color:0x111214,flatShading:true});
@@ -601,6 +603,7 @@ function buildWeather(){
   // the burning treeline: bare trunks along the ridge, black against the flames
   const trM=new THREE.MeshBasicMaterial({color:0x050302});
   for(let i=0;i<fp.length;i+=15){const h=rand(2.5,4.5),tr=new THREE.Mesh(new THREE.ConeGeometry(rand(0.4,0.8),h,4),trM);tr.position.set(fp[i],fp[i+1]+h/2-0.4,fp[i+2]);ridge.add(tr);}
+  mergeDeep(ridge);
   // firelight off the ridge, enough to pick the ridge and the mountain faces out of the dark
   fireLight=new THREE.PointLight(0xff5a1e,0,260,1);fireLight.position.set(50,10,-56);scene.add(fireLight);
   // a red glow low on the horizon, behind the mountains, so they stand out as shapes
@@ -757,16 +760,19 @@ function buildLevel(){
   wm.castShadow=true;wm.receiveShadow=true;levelGroup.add(wm);
   // void cap over solid interior so nothing reads as floor
   // cracked walls, crates
+  const forest=new THREE.Group(),barkM=L(0x1c1714);
   for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
     const c=G[y][x];
     if(c==='c'){const m=new THREE.Mesh(box(S,WH,S),[L(0xffffff),L(0xffffff),topMat,topMat,L(0xffffff),L(0xffffff)].map((mm,i)=>{if(i===2||i===3)return mm;mm.map=texCrack;return mm;}));m.position.set(tw(x),WH/2,tw(y));m.castShadow=m.receiveShadow=true;levelGroup.add(m);crackHP[y*GW+x]={hp:60,mesh:m,x,y};}
     if(c==='x'){const m=new THREE.Mesh(box(S*0.86,1.5,S*0.86),new THREE.MeshPhongMaterial({shininess:4,specular:0x0a0a0a,map:texCrate}));m.position.set(tw(x)+rand(-.1,.1),0.75,tw(y)+rand(-.1,.1));m.rotation.y=rand(-.15,.15);m.castShadow=m.receiveShadow=true;levelGroup.add(m);
       if(Math.random()<.6){const m2=m.clone();m2.scale.setScalar(.6);m2.position.y=1.5+.45;m2.rotation.y=rand(0,1);levelGroup.add(m2);}}
     if(c==='D'||c==='R'||c==='B'||c==='G')makeDoor(x,y,c);
-    if(c==='T'){const t=new THREE.Group();t.position.set(tw(x)+rand(-.5,.5),0,tw(y)+rand(-.5,.5));const h=rand(4.5,8);const bark=L(0x1c1714);
-      mk(cyl(0.14,0.34,h,6),bark,0,h/2,0,t);for(let k=0;k<4;k++){const b=mk(cyl(0.04,0.08,rand(1.2,2.6),4),bark,0,h*rand(.45,.9),0,t);b.rotation.z=rand(-1.3,1.3);b.rotation.y=rand(0,TAU);}
-      levelGroup.add(t);}
+    if(c==='T'){const t=new THREE.Group();t.position.set(tw(x)+rand(-.5,.5),0,tw(y)+rand(-.5,.5));const h=rand(4.5,8);
+      mk(cyl(0.14,0.34,h,6),barkM,0,h/2,0,t);for(let k=0;k<4;k++){const b=mk(cyl(0.04,0.08,rand(1.2,2.6),4),barkM,0,h*rand(.45,.9),0,t);b.rotation.z=rand(-1.3,1.3);b.rotation.y=rand(0,TAU);}
+      // flatten into the forest group so the whole treeline becomes one draw call instead of five per tree
+      t.updateMatrix();for(const m of [...t.children]){m.applyMatrix4(t.matrix);forest.add(m);}}
   }
+  mergeDeep(forest);levelGroup.add(forest);
   // shaft chamber: the pit
   const pit=new THREE.Group();pit.position.set(50,0.02,10);
   const hole=new THREE.Mesh(new THREE.CircleGeometry(3.2,20),BASIC(0x000000));hole.rotation.x=-Math.PI/2;pit.add(hole);
@@ -1469,7 +1475,7 @@ function kitAdd(o,def){
   K.smoke=[];for(let i=0;i<6;i++){const s=kitSprite(0x8a8682,0.1,false);fx.add(s);K.smoke.push({s,life:0,v:new V3()});}
   K.breath=[];for(let i=0;i<4;i++){const s=kitSprite(0x9a9aa4,0.1,false);fx.add(s);K.breath.push({s,life:0,v:new V3()});}K.brT=Math.random();
   // the magazine as its own piece, plus brass and a spare body for the dropped one
-  g.traverse(m=>{if(m.isMesh&&m.geometry.parameters&&Math.abs(m.geometry.parameters.height-0.13)<1e-4&&Math.abs(m.geometry.parameters.width-0.034)<1e-4)K.gunMag=m;});
+  g.traverse(m=>{if(m.isMesh&&m.geometry.parameters&&Math.abs(m.geometry.parameters.height-0.13)<1e-4&&Math.abs(m.geometry.parameters.width-0.034)<1e-4)K.gunMag=m;});if(K.gunMag)K.gunMag.userData.keep=true;
   const magGeo=box(0.034,0.13,0.06),magM=L(0x1b1d20);
   K.handMag=mk(magGeo,magM,0,0,0);K.handMag.visible=false;fx.add(K.handMag);
   K.dropMag=kitLoose(fx,mk(magGeo,magM,0,0,0),0.3);
@@ -1615,13 +1621,13 @@ function mergeDeep(root){
   const groups=[];root.traverse(o=>{if(!o.isMesh)groups.push(o);});
   for(const grp of groups){
     const by=new Map();
-    for(const c of [...grp.children]){if(!c.isMesh||c.isSkinnedMesh||c.children.length)continue;c.updateMatrix();
+    for(const c of [...grp.children]){if(!c.isMesh||c.isSkinnedMesh||c.children.length||!c.visible||c.userData.keep)continue;c.updateMatrix();
       const gg=c.geometry.index?c.geometry.toNonIndexed():c.geometry.clone();gg.applyMatrix4(c.matrix);
       if(!by.has(c.material))by.set(c.material,[]);by.get(c.material).push({gg,cs:c.castShadow});grp.remove(c);}
     for(const [mat,list] of by){let n=0;for(const {gg} of list)n+=gg.attributes.position.count;
-      const pos=new Float32Array(n*3),nor=new Float32Array(n*3);let o=0;
-      for(const {gg} of list){pos.set(gg.attributes.position.array,o*3);if(gg.attributes.normal)nor.set(gg.attributes.normal.array,o*3);o+=gg.attributes.position.count;gg.dispose();}
-      const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+      const pos=new Float32Array(n*3),nor=new Float32Array(n*3),uv=mat.map?new Float32Array(n*2):null;let o=0;
+      for(const {gg} of list){pos.set(gg.attributes.position.array,o*3);if(gg.attributes.normal)nor.set(gg.attributes.normal.array,o*3);if(uv&&gg.attributes.uv)uv.set(gg.attributes.uv.array,o*2);o+=gg.attributes.position.count;gg.dispose();}
+      const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.BufferAttribute(nor,3));if(uv)geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
       const m=new THREE.Mesh(geo,mat);m.castShadow=list.some(x=>x.cs);grp.add(m);}
   }
 }
@@ -1971,7 +1977,7 @@ const OBJ=['Get inside the facility','Restart the yard generator','Search the of
 let laser;
 
 function makePlayer(){
-  const o=makeHuman({armor:0x2a2c2e,armor2:0x151617,glow:0xd8302a,suit:0x1e2022,guns:['pistol','long']});scene.add(o);
+  const o=makeHuman({armor:0x2a2c2e,armor2:0x151617,glow:0xd8302a,suit:0x1e2022,guns:['pistol','long']});mergeDeep(o);scene.add(o);
   const w=validLoadout();
   const mags={};w.forEach(k=>mags[k]=WEAP[k].mag);
   return {obj:o,pos:o.position,hp:100,max:100,weapons:w,cur:0,mags,ammo:{p:16,s:w.includes('jericho')?8:0,r:w.includes('thunders')?60:0,j:w.includes('hook')?3:0,m:w.includes('watch')?15:0},keys:{},bandages:1,wrap:null,cd:0,reload:0,walk:0,isPlayer:true,yaw:0,pitch:0,kick:0,moveAmt:0,
@@ -1980,7 +1986,7 @@ function makePlayer(){
       if(this.hp<=0){this.hp=0;gameOver();}}};
 }
 function makeAlly(def){
-  const o=makeHuman({armor:def.armor,armor2:def.armor2,glow:def.glow,body:def.body,suit:def.suit,guns:['long']});scene.add(o);kitAdd(o,def);
+  const o=makeHuman({armor:def.armor,armor2:def.armor2,glow:def.glow,body:def.body,suit:def.suit,guns:['long']});scene.add(o);kitAdd(o,def);mergeDeep(o);
   return {obj:o,pos:o.position,name:def.name,call:def.call,fem:def.body==='f',bleed:0,ffKnock:false,hp:100,max:100,cd:rand(0,.5),mag:20,reload:0,downed:false,revive:0,walk:0,
     hurt(d,src){if(this.downed)return;this.hp-=d;this.obj.userData.flinch=1;if(this.hp<=0){this.hp=0;this.downed=true;this.revive=0;this.bleed=BLEED;this.ffKnock=false;sfx.down();radio([this.name,'I\u2019m hit! Get me up!'],true);}}};
 }
@@ -3969,6 +3975,31 @@ function missionComplete2(){
   resetInput();$('hud').hidden=true;$('win').hidden=false;
 }
 
+// ================= PERFORMANCE =================
+// Enemies, crates, pickups and notes past the fog or behind walls are invisible anyway, but were still drawn (≈29 draw
+// calls a wolf, ~10 a crate). Hide them until they come back into view (line of sight is rechecked every few frames); only ever un-hide what this hid, so anything the game hides on purpose (dormant brood) stays hidden.
+// Lights that sit at zero outside a cutscene (command room, heli, ridge fire, fleet) leave the light list while dark, so every
+// material in the level stops paying for them.
+let _perfLights=null;
+function perfHide(o,hide){if(!o)return;if(hide){if(o.visible){o.visible=false;o.userData.fogHid=true;}}else if(o.userData.fogHid){o.visible=true;o.userData.fogHid=false;}}
+let _perfTick=0;
+function perfCull(){
+  const cam=camera.position,far=(scene.fog?scene.fog.far:120)+4,far2=far*far,on=(state==='play'||state==='paused')&&!!player;_perfTick++;
+  // past the fog, or on the far side of a wall (the facility is solid tiles floor to ceiling, so this matches what the eye sees)
+  const test=(rec,x,z)=>{if(!on)return false;const dx=x-cam.x,dz=z-cam.z,d2=dx*dx+dz*dz;if(d2>far2)return true;if(d2<36)return false;
+    if(rec.losT===undefined)rec.losT=_perfTick%6;if(--rec.losT<=0){rec.losT=6;rec.losHid=!los(player.pos.x,player.pos.z,x,z);}return !!rec.losHid;};
+  for(const e of enemies){if(!e.obj||e.type==='abaddon'||e.type==='dragon')continue;perfHide(e.obj,test(e,e.obj.position.x,e.obj.position.z));}
+  for(const c of containers){if(c.prop||!c.g)continue;perfHide(c.g,test(c,c.g.position.x,c.g.position.z));}
+  for(const q of pickups){const h=test(q,q.m.position.x,q.m.position.z);perfHide(q.m,h);perfHide(q.glow,h);}
+  for(const n of notes)perfHide(n.g,test(n,n.g.position.x,n.g.position.z));
+  if(!_perfLights){_perfLights=[...setLights,fireLight].filter(Boolean);}
+  // Commander Vale and her briefing room only exist for the opening: don't draw them from the yard
+  if(vale)vale.visible=vale.position.distanceToSquared(cam)<30*30;
+  if(roomSet)roomSet.visible=roomSet.position.distanceToSquared(cam)<30*30;
+  if(fleet&&!_perfLights.includes(fleet.flash))_perfLights.push(fleet.flash,fleet.ours.children.find(c=>c.isPointLight));
+  for(const l of _perfLights)if(l)l.visible=l.intensity>0.001;
+}
+
 // ================= LOOP =================
 const clock=new THREE.Clock();
 buildGrid();buildLevel();buildSets();buildWeather();resize();renderArmory();
@@ -3979,7 +4010,7 @@ function loop(){
   if(state==='play')update(dt);
   else if(state==='over')deathT=Math.min(1,deathT+dt*1.1);
   else if(state==='cine'){updateCine(dt);if(player){animHuman(player.obj,dt,0,0,-1);(mission===2?roster.filter(a=>a.joined||!a.spot||a.spot==='olsen'):allies).forEach(a=>animHuman(a.obj,dt,0,0,-1));}}
-  updateAmbient(dt);updateSets(dt);updateCamera(dt);kitSync();
+  updateAmbient(dt);updateSets(dt);updateCamera(dt);kitSync();perfCull();
   renderer.setRenderTarget(rt);renderer.render(scene,camera);
   if((state==='play'||state==='paused')&&player&&player.hp>0){renderer.autoClear=false;renderer.clearDepth();renderer.render(vmScene,vmCam);renderer.autoClear=true;}
   renderer.setRenderTarget(null);renderer.render(postScene,postCam);
